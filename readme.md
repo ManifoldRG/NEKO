@@ -11,7 +11,7 @@ Trainable GATO implementation for control tasks.
 
 ## Credits
 
-This implementation is influenced and uses components from:
+This implementation is influenced or uses components from:
 - https://github.com/OrigamiDream/gato/tree/main
 - https://github.com/LAS1520/Gato-A-Generalist-Agent
 - [VIMA: General Robot Manipulation with Multimodal Prompts](https://arxiv.org/abs/2210.03094): https://github.com/vimalabs/VIMA

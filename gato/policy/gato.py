@@ -13,7 +13,8 @@ class GatoPolicy(nn.Module):
         heads: int,
         dropout: float
     ):
-        
+        # TODO, add option for disabling positional embeddings
+
         super().__init__()
 
         # this is a dummy value as this implementation does not yet handle language IO
@@ -53,7 +54,7 @@ class GatoPolicy(nn.Module):
 
 
         ## Inner-timestep Embeddings
-        self.observation_pos_embd
+        self.pos_embed_observation = nn.Embedding()
 
 
 
