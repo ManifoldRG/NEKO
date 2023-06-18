@@ -13,12 +13,12 @@ class ImageEmbedding(nn.Module):
             resid_mid_channels=128,
             num_groups=32,
             position_vocab_size=128
-
     ):
         self.patch_size = patch_size
         self.patch_embedding = ResidualBlock_V2(mid_channels=resid_mid_channels, num_groups=num_groups)
+        self.post_embedding_projection = nn.Linear(patch_size * patch_size * 3, embed_dim)
 
-        self.position_vocab_size position_vocab_size
+        self.position_vocab_size = position_vocab_size
         self.height_pos_embedding = nn.Embedding(position_vocab_size, embed_dim)
         self.width_pos_embedding = nn.Embedding(position_vocab_size, embed_dim)
     
@@ -41,15 +41,22 @@ class ImageEmbedding(nn.Module):
          
         # split into patches, rearrange
         x = rearrange(x, 'b c (n_h p) (n_w p) -> b n_h n_w c p p', p=self.patch_size)
-         
+
         # number of patches along height,width
         n_height = x.shape[1]
         n_width = x.shape[2]
 
+        # embed patches
+        x = self.patch_embedding(x)
+
+        # rearrange again:
+        #TODO: x = rearrange(x, 'b c (n_h p) (n_w p) -> b n_h n_w c p p', p=self.patch_size)
+        # post linear projection
+         
         training = False # TODO, infer this, or pass
         #training = True
 
-
+        # Compute positional encodings for each patch
         # compute intervals
         h_linspace = torch.linspace(0, 1, n_height + 1, device=x.device)
         w_linspace = torch.linspace(0, 1, n_width + 1, device=x.device)
@@ -64,17 +71,21 @@ class ImageEmbedding(nn.Module):
 
         # sample from intervals or use mean
         if training:
-            # verify this works
-            # h_positions = torch.randint(h_intervals[:,0], h_intervals[:,1], size=(n_height,), device=x.device)
-            # w_positions = torch.randint(w_intervals[:,0], w_intervals[:,1], size=(n_width,), device=x.device)
+            # sample from interval
+            h_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1] + 1, size=()) for interval in h_intervals], dtype=x.device)
+            w_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1] + 1, size=()) for interval in w_intervals], dtype=x.device)
         else:
-            # h_positions = torch.mean(h_intervals, dim=-1)
-            # w_positions = torch.mean(w_intervals, dim=-1)
+            h_positions = torch.mean(h_intervals, dim=-1)
+            w_positions = torch.mean(w_intervals, dim=-1)
         
         # now get embeddings
+        h_position_embed = self.height_pos_embedding(h_positions)
+        w_position_embed = self.width_pos_embedding(w_positions)
 
+        # now add these
+        # TODO
 
-
+        # return x
 
 class ResidualBlock_V2(nn.Module):
 
