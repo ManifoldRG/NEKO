@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-from gato.gpt import HFGPT
+from gato.transformers import HFGPT
+from gato.policy.embeddings import ImageEmbedding
+from gato.policy.tokenizers import ContinuousTokenizer
 
 
 class GatoPolicy(nn.Module):
@@ -11,7 +13,20 @@ class GatoPolicy(nn.Module):
         embed_dim: int, 
         layers: int,
         heads: int,
-        dropout: float
+
+        dropout: float,
+
+        mu: int = 100,
+        M: int = 256,
+
+        patch_size: int = 16,
+        resid_mid_channels: int = 128,
+        num_groups: int = 32,
+        position_vocab_size: int = 128,
+
+        use_pos_encoding: bool = True,
+        use_patch_pos_encoding: bool = True,
+
     ):
         # TODO, add option for disabling positional embeddings
 
@@ -46,17 +61,31 @@ class GatoPolicy(nn.Module):
         # Tokenizers
         self.text_tokenizer = None # e.g. SentencePiece
 
+        self.continuous_action_tokenizer = ContinuousTokenizer(
+            use_mu_law=False, mu=mu, M=M, n_bins=self.continous_tokens, offset=self.token_starts['continous']
+        ) # continuous actions expected to be in [-1, 1]
+        
+        self.continuous_obs_tokenizer = ContinuousTokenizer(
+            use_mu_law=True, mu=mu, M=M, n_bins=self.continous_tokens, offset=self.token_starts['continous']
+        ) # continuous actions expected to be in [-1, 1]
 
-        # Embeddings
+
+        # Token Embeddings
         self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
 
         ## Image Embeddings
-
+        self.image_embedding = ImageEmbedding(
+            embed_dim=embed_dim,
+            patch_size=patch_size,
+            resid_mid_channels=resid_mid_channels,
+            num_groups=num_groups,
+            position_vocab_size=position_vocab_size,
+            use_pos_encoding=self.use_patch_pos_encoding,
+        )
 
         ## Inner-timestep Embeddings
+        self.use_pos_encoding = use_pos_encoding
         self.pos_embed_observation = nn.Embedding()
-
-
 
 
     # predicts next token (for each input token)
@@ -65,4 +94,8 @@ class GatoPolicy(nn.Module):
     
     # generate the next n tokens
     def predict_n(self, x):
+        pass
+
+    # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
+    def predict_control(self, x, env):
         pass

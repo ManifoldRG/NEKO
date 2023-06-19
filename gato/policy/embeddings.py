@@ -12,27 +12,25 @@ class ImageEmbedding(nn.Module):
             patch_size=16,
             resid_mid_channels=128,
             num_groups=32,
-            position_vocab_size=128
+            position_vocab_size=128,
+            use_pos_encoding=True
     ):
         self.patch_size = patch_size
+        self.embed_dim = embed_dim
+
         self.patch_embedding = ResidualBlock_V2(mid_channels=resid_mid_channels, num_groups=num_groups)
         self.post_embedding_projection = nn.Linear(patch_size * patch_size * 3, embed_dim)
 
-        self.position_vocab_size = position_vocab_size
-        self.height_pos_embedding = nn.Embedding(position_vocab_size, embed_dim)
-        self.width_pos_embedding = nn.Embedding(position_vocab_size, embed_dim)
+        self.use_pos_encoding = use_pos_encoding
+        self.patch_pos_encoding = PatchPosEncoding(position_vocab_size=position_vocab_size, embed_dim=embed_dim)
     
     def forward(self, x, normalize=True):
         # reshape? (B x 1 x H x W) -> (B x 3 x H x W) if C = 1 TODO, probably do this before this function
-        # assume all inputs have 3 channels, and dimensions are divisible by patch_size
-        # all images in batch have same weight/width but network can handle inputs of different sizes through multiple forward passes
-
+        # all images in batch must have same weight/width but network can handle inputs of different sizes through multiple forward passes
         image_height = x.shape[2]
         image_width = x.shape[3]
 
         assert image_height % self.patch_size == 0 and image_width % self.patch_size == 0, "Image dimensions must be divisible by patch size"
-
-        num_patches = (image_height // self.patch_size) * (image_width // self.patch_size)
 
         if normalize:
             # map from 0 to 255 to [-1,1], then scale by patch_size
@@ -42,21 +40,37 @@ class ImageEmbedding(nn.Module):
         # split into patches, rearrange
         x = rearrange(x, 'b c (n_h p) (n_w p) -> b n_h n_w c p p', p=self.patch_size)
 
-        # number of patches along height,width
-        n_height = x.shape[1]
-        n_width = x.shape[2]
-
         # embed patches
         x = self.patch_embedding(x)
 
         # rearrange again:
-        #TODO: x = rearrange(x, 'b c (n_h p) (n_w p) -> b n_h n_w c p p', p=self.patch_size)
-        # post linear projection
-         
-        training = False # TODO, infer this, or pass
-        #training = True
+        x = rearrange(x, 'b n_h n_w c p p -> b n_h n_w (c p p)', p=self.patch_size)
 
-        # Compute positional encodings for each patch
+        # post linear projection
+        x = self.post_embedding_projection(x)
+         
+        # now add positional encoding
+        if self.use_pos_encoding:
+            x = x + self.patch_pos_encoding(x)
+
+        return x
+
+class PatchPosEncoding(nn.Module):
+    def __init__(self, position_vocab_size=128, embed_dim=768):
+        super().__init__()
+
+        self.position_vocab_size = position_vocab_size
+        self.embed_dim = embed_dim
+        self.height_pos_embedding = nn.Embedding(position_vocab_size, embed_dim)
+        self.width_pos_embedding = nn.Embedding(position_vocab_size, embed_dim)
+        
+    def forward(self, x):
+        # x: B x n_height x n_width x embed_dim
+
+        # number of patches along height,width
+        n_height = x.shape[1]
+        n_width = x.shape[2]
+
         # compute intervals
         h_linspace = torch.linspace(0, 1, n_height + 1, device=x.device)
         w_linspace = torch.linspace(0, 1, n_width + 1, device=x.device)
@@ -70,7 +84,7 @@ class ImageEmbedding(nn.Module):
         w_intervals = (w_intervals * self.position_vocab_size).to(dtype=torch.int32)
 
         # sample from intervals or use mean
-        if training:
+        if self.training:
             # sample from interval
             h_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1] + 1, size=()) for interval in h_intervals], dtype=x.device)
             w_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1] + 1, size=()) for interval in w_intervals], dtype=x.device)
@@ -79,14 +93,15 @@ class ImageEmbedding(nn.Module):
             w_positions = torch.mean(w_intervals, dim=-1)
         
         # now get embeddings
-        h_position_embed = self.height_pos_embedding(h_positions)
-        w_position_embed = self.width_pos_embedding(w_positions)
+        h_position_embed = self.height_pos_embedding(h_positions) # n_height x embed_dim
+        w_position_embed = self.width_pos_embedding(w_positions) # n_width x embed_dim
 
-        # now add these
-        # TODO
+        # combine height, width embeddings
+        h_position_embed = h_position_embed.unsqueeze(1).repeat(1, n_width, 1) # n_height x n_width x embed_dim
+        w_position_embed = w_position_embed.unsqueeze(0).repeat(n_height, 1, 1) # n_height x n_width x embed_dim
 
-        # return x
-
+        position_embed = h_position_embed + w_position_embed
+        return position_embed
 class ResidualBlock_V2(nn.Module):
 
     def __init__(self, mid_channels: int = 128, num_groups: int = 32):
