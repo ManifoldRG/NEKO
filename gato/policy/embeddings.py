@@ -47,11 +47,13 @@ class ImageEmbedding(nn.Module):
         x = rearrange(x, 'b n_h n_w c p p -> b n_h n_w (c p p)', p=self.patch_size)
 
         # post linear projection
-        x = self.post_embedding_projection(x)
+        x = self.post_embedding_projection(x) # b n_h n_w embed_dim
          
         # now add positional encoding
         if self.use_pos_encoding:
             x = x + self.patch_pos_encoding(x)
+
+        x = rearrange(x, 'b n_h n_w embed_dim -> b (n_h n_w) embed_dim', p=self.patch_size)
 
         return x
 

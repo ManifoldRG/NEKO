@@ -7,6 +7,16 @@ custom_env_loaders = {
 }
 
 
+def load_envs(dataset_names: list, load_kwargs: dict = {}):
+    envs = []
+    datasets = []
+    for dataset_name in dataset_names:
+        env, dataset = load_env_dataset(dataset_name, load_kwargs)
+        envs.append(env)
+        datasets.append(dataset)
+    return envs, datasets
+
+
 def load_env_dataset(dataset_name: str, load_kwargs: dict = {}):
     # load dataset
     dataset = minari.load_dataset(dataset_name)
