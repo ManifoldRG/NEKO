@@ -10,7 +10,10 @@ from gato.training.trainer import Trainer
 def main(args):
     envs, datasets = load_envs(args.datasets)
 
-    model = GatoPolicy() # TODO
+    model = GatoPolicy(
+        continuous_tokens=args.continuous_tokens
+        discrete_tokens=args.discrete_tokens
+    ) # TODO
 
     optimizer = torch.optim.AdamW(
         model.parameters(),

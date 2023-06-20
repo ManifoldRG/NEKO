@@ -23,19 +23,25 @@ class GatoPolicy(nn.Module):
         resid_mid_channels: int = 128,
         num_groups: int = 32,
         position_vocab_size: int = 128,
+        continuous_tokens: int = 1024,
+        discrete_tokens: int = 1024,
+
+        context=1024,
 
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
+        
 
     ):
         # TODO, add option for disabling positional embeddings
 
         super().__init__()
 
+        self.context = context
         # this is a dummy value as this implementation does not yet handle language IO
         self.text_tokens = 32000 # SentencePiece vocab size
-        self.continous_tokens = 1024
-        self.discrete_tokens = 1024
+        self.continous_tokens = continuous_tokens
+        self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continous_tokens
         
         # order of text, continous, discrete
@@ -86,7 +92,7 @@ class GatoPolicy(nn.Module):
 
         ## Inner-timestep Embeddings
         self.use_pos_encoding = use_pos_encoding
-        self.pos_embed_observation = nn.Embedding()
+        self.pos_embed_observation = nn.Embedding(context, embed_dim)
 
 
     # predicts next token (for each input token)
@@ -144,14 +150,10 @@ class GatoPolicy(nn.Module):
         n_batches = len(inputs)
 
         token_embeddings = []
-        token_ids = []
-        token_targets = []
+        tokens = []
+        token_target_masks = []
 
         for batch in inputs:
-            batch_embeddings = []
-            batch_ids = []
-            batch_targets = []
-
             text_tokens, text_embeddings, text_targets = None, None, None
             image_tokens, image_embeddings, image_targets = None, None, None
             continuous_tokens, continuous_embeddings, continuous_targets = None, None, None
@@ -213,17 +215,37 @@ class GatoPolicy(nn.Module):
                 else:
                     assert n_timesteps == action_tokens.shape[0], "number of timesteps must be the same for all modalities"
 
-            separator_embeddings = torch.ones(n_timesteps, self.embed_dim) * self.separator_token
+            separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim) * self.separator_token
             separator_tokens = torch.ones(n_timesteps, 1) * -1
             separator_targets = torch.zeros(n_timesteps, 1)
             
             # interleave observation, action tokens,add separator
+
+            # interleave tokens
+            batch_tokens = torch.cat([text_tokens, image_tokens, continuous_tokens, discrete_tokens, separator_tokens, action_tokens], dim=1)
+
+            # interleave targets
+            batch_target_masks = torch.cat([text_targets, image_targets, continuous_targets, discrete_targets, separator_targets, action_targets], dim=1)
+
+            # interleave embeddings, n_timesteps x n_tokens x embed_dim
+            batch_embeddings = torch.cat([text_embeddings, image_embeddings, continuous_embeddings, discrete_embeddings], dim=1) # concat observations
+            n_observation_tokens = batch_embeddings.shape[1] # number of tokens per timestep
+            if self.use_pos_encoding:
+                inner_timestep_embeddings = self.pos_embed_observation(torch.arange(n_observation_tokens)).unsqueeze(0) # 1 x n_tokens x embed_dim
+                # repeat for each timestep
+                inner_timestep_embeddings = inner_timestep_embeddings.repeat(n_timesteps, 1, 1)
+                batch_embeddings = batch_embeddings + inner_timestep_embeddings
+
+            batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
             
+            n_tokens = batch_embeddings.shape[1] # number of tokens per timestep
 
+            token_embeddings.append(batch_embeddings)
+            tokens.append(batch_tokens)
+            token_target_masks.append(batch_target_masks)
 
-        # join lists 
-        # TODO
-        return token_embeddings, token_ids, token_targets
+        # TODO, potentially pad / concat lists, return tensors 
+        return token_embeddings, tokens, token_target_masks
     
     # generate the next n tokens
     def predict_n(self, x):
