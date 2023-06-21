@@ -3,7 +3,7 @@ import argparse
 import torch
 
 from utils import DotDict
-from gato.policy.gato import GatoPolicy
+from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 
@@ -11,7 +11,7 @@ def main(args):
     envs, datasets = load_envs(args.datasets)
 
     model = GatoPolicy(
-        continuous_tokens=args.continuous_tokens
+        continuous_tokens=args.continuous_tokens,
         discrete_tokens=args.discrete_tokens
     ) # TODO
 

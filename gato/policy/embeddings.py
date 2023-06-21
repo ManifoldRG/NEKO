@@ -15,6 +15,7 @@ class ImageEmbedding(nn.Module):
             position_vocab_size=128,
             use_pos_encoding=True
     ):
+        super().__init__()
         self.patch_size = patch_size
         self.embed_dim = embed_dim
 
@@ -31,6 +32,8 @@ class ImageEmbedding(nn.Module):
         image_width = x.shape[3]
 
         assert image_height % self.patch_size == 0 and image_width % self.patch_size == 0, "Image dimensions must be divisible by patch size"
+        n_height = image_height // self.patch_size
+        n_width = image_width // self.patch_size
 
         if normalize:
             # map from 0 to 255 to [-1,1], then scale by patch_size
@@ -38,13 +41,13 @@ class ImageEmbedding(nn.Module):
             x = x / math.sqrt(self.patch_size)
          
         # split into patches, rearrange
-        x = rearrange(x, 'b c (n_h p) (n_w p) -> b n_h n_w c p p', p=self.patch_size)
+        x = rearrange(x, 'b c (n_h p_1) (n_w p_2) -> (b n_h n_w) c p_1 p_2', p_1=self.patch_size, p_2=self.patch_size)
 
         # embed patches
         x = self.patch_embedding(x)
 
         # rearrange again:
-        x = rearrange(x, 'b n_h n_w c p p -> b n_h n_w (c p p)', p=self.patch_size)
+        x = rearrange(x, '(b n_h n_w) c p_1 p_2 -> b n_h n_w (c p_1 p_2)', p_1=self.patch_size, p_2=self.patch_size, n_h=n_height, n_w=n_width)
 
         # post linear projection
         x = self.post_embedding_projection(x) # b n_h n_w embed_dim
@@ -53,7 +56,7 @@ class ImageEmbedding(nn.Module):
         if self.use_pos_encoding:
             x = x + self.patch_pos_encoding(x)
 
-        x = rearrange(x, 'b n_h n_w embed_dim -> b (n_h n_w) embed_dim', p=self.patch_size)
+        x = rearrange(x, 'b n_h n_w embed_dim -> b (n_h n_w) embed_dim')
 
         return x
 
@@ -88,12 +91,13 @@ class PatchPosEncoding(nn.Module):
         # sample from intervals or use mean
         if self.training:
             # sample from interval
-            h_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1] + 1, size=()) for interval in h_intervals], dtype=x.device)
-            w_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1] + 1, size=()) for interval in w_intervals], dtype=x.device)
+            h_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1], size=()) for interval in h_intervals], device=x.device)
+            w_positions = torch.tensor([torch.randint(low=interval[0], high=interval[1], size=()) for interval in w_intervals], device=x.device)
         else:
-            h_positions = torch.mean(h_intervals, dim=-1)
-            w_positions = torch.mean(w_intervals, dim=-1)
-        
+            h_intervals[:, 1] = h_intervals[:, 1] - 1
+            w_intervals[:, 1] = w_intervals[:, 1] - 1
+            h_positions = h_intervals.mean(dim=-1,dtype=torch.float32).round().to(dtype=torch.int32)
+            w_positions = w_intervals.mean(dim=-1,dtype=torch.float32).round().to(dtype=torch.int32)
         # now get embeddings
         h_position_embed = self.height_pos_embedding(h_positions) # n_height x embed_dim
         w_position_embed = self.width_pos_embedding(w_positions) # n_width x embed_dim
@@ -107,21 +111,21 @@ class PatchPosEncoding(nn.Module):
 class ResidualBlock_V2(nn.Module):
 
     def __init__(self, mid_channels: int = 128, num_groups: int = 32):
-
         super().__init__()
         in_channels = 3
 
         # Specific architecture not provided, potentially different
-        self.gn1 = nn.GroupNorm(num_groups, in_channels)
-        self.act1 = nn.GeLU()
+        #self.gn1 = nn.GroupNorm(num_groups, in_channels)
+        self.gn1 = nn.Identity()
+        self.act1 = nn.GELU()
         self.conv1 = nn.Conv2d(in_channels, mid_channels, kernel_size=3, stride=1, padding=1) # Could do 1x1, 0 padding
 
         self.gn2 = nn.GroupNorm(num_groups, mid_channels)
-        self.act2 = nn.GeLU()
+        self.act2 = nn.GELU()
         self.conv2 = nn.Conv2d(mid_channels, in_channels, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
         # input: B x 3 x 16 x 16
-        h = self.conv1(self.act1(self.g1(x)))
-        h = self.conv2(self.act2(self.g2(h)))
+        h = self.conv1(self.act1(self.gn1(x)))
+        h = self.conv2(self.act2(self.gn2(h)))
         return x + h

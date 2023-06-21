@@ -149,7 +149,6 @@ class OpenAIGPTModel(OpenAIGPTPreTrainedModel):
         if position_ids is None:
             # Code is different from when we had a single embedding matrix  from position and token embeddings
             position_ids = self.position_ids[None, : input_shape[-1]]
-
         # Attention mask.
         if attention_mask is not None:
             # We create a 3D attention mask from a 2D tensor mask.
@@ -174,13 +173,17 @@ class OpenAIGPTModel(OpenAIGPTPreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.tokens_embed(input_ids)
-        position_embeds = self.positions_embed(position_ids)
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1))
-            token_type_embeds = self.tokens_embed(token_type_ids)
+
+            position_embeds = self.positions_embed(position_ids)
+            if token_type_ids is not None:
+                token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1))
+                token_type_embeds = self.tokens_embed(token_type_ids)
+            else:
+                token_type_embeds = 0
+            hidden_states = inputs_embeds + position_embeds + token_type_embeds
         else:
-            token_type_embeds = 0
-        hidden_states = inputs_embeds + position_embeds + token_type_embeds
+            hidden_states = inputs_embeds
+
         hidden_states = self.drop(hidden_states)
 
         output_shape = input_shape + (hidden_states.size(-1),)
