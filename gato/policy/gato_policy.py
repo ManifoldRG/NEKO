@@ -64,6 +64,10 @@ class GatoPolicy(nn.Module):
         )
         # TODO, add option to init from pretrained LM
 
+        # head
+        self.predict_token = nn.Linear(embed_dim, self.vocab_size, bias=False)
+
+
         self.separator_token = nn.Parameter(torch.zeros(embed_dim))
 
         # Tokenizers
@@ -95,6 +99,7 @@ class GatoPolicy(nn.Module):
         ## Inner-timestep Embeddings
         self.use_pos_encoding = use_pos_encoding
         self.pos_embed_observation = nn.Embedding(context, embed_dim)
+
 
 
     # predicts next token (for each input token)
