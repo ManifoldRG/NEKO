@@ -41,3 +41,5 @@ if __name__ == '__main__':
 
     # load atari
     atari_env, atari_dataset = load_env_dataset('Breakout-expert_s0-v0')
+
+    import pdb; pdb.set_trace()

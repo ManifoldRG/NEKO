@@ -27,7 +27,7 @@ class GatoPolicy(nn.Module):
         continuous_tokens: int = 1024,
         discrete_tokens: int = 1024,
 
-        context=1024,
+        context_len=1024,
 
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
@@ -38,7 +38,7 @@ class GatoPolicy(nn.Module):
 
         super().__init__()
 
-        self.context = context
+        self.context_len = context_len
         # this is a dummy value as this implementation does not yet handle language IO
         self.text_tokens = 32000 # SentencePiece vocab size
         self.continous_tokens = continuous_tokens
@@ -60,7 +60,7 @@ class GatoPolicy(nn.Module):
             n_head=heads,
             dropout=dropout,
             vocab_size=self.vocab_size,
-            n_positions=context,
+            n_positions=context_len,
         )
         # TODO, add option to init from pretrained LM
 
@@ -98,7 +98,7 @@ class GatoPolicy(nn.Module):
 
         ## Inner-timestep Embeddings
         self.use_pos_encoding = use_pos_encoding
-        self.pos_embed_observation = nn.Embedding(context, embed_dim)
+        self.pos_embed_observation = nn.Embedding(context_len, embed_dim)
 
 
 
@@ -110,7 +110,6 @@ class GatoPolicy(nn.Module):
         # pass to transformer
         output = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
         return output
-        #import pdb; pdb.set_trace()
 
 
     def tokenize_input_dicts(self, inputs):
@@ -199,7 +198,7 @@ class GatoPolicy(nn.Module):
                     assert n_timesteps == n_images, "number of timesteps must be the same for all modalities"
             
             if 'continuous' in batch and batch['continuous'] is not None:
-                continuous_tokens = self.continuous_obs_tokenizer.tokenize(batch['continuous'])
+                continuous_tokens = self.continuous_obs_tokenizer.encode(batch['continuous'])
                 continuous_embeddings = self.embed_token(continuous_tokens)
                 continuous_targets = torch.zeros_like(continuous_tokens)
 
@@ -219,7 +218,7 @@ class GatoPolicy(nn.Module):
                     assert n_timesteps == discrete_tokens.shape[0], "number of timesteps must be the same for all modalities"
             
             if 'continuous_actions' in batch and batch['continuous_actions'] is not None:
-                continuous_action_tokens = self.continuous_action_tokenizer.tokenize(batch['continuous_actions'])
+                continuous_action_tokens = self.continuous_action_tokenizer.encode(batch['continuous_actions'])
                 continuous_action_embeddings = self.embed_token(continuous_action_tokens)
                 continuous_action_targets = torch.ones_like(continuous_action_tokens)
                 
@@ -306,9 +305,9 @@ class GatoPolicy(nn.Module):
             # store which tokens are padding and which are real
             token_masks.append(torch.cat([torch.zeros(1, max_tokens -  token_embeddings[i].shape[1]), torch.ones(1,  token_embeddings[i].shape[1])], dim=1))
             
-            batch_embeddings = torch.cat([torch.zeros(1, max_tokens - token_embeddings[i].shape[1], self.embed_dim), token_embeddings[i]], dim=1)
-            batch_tokens = torch.cat([torch.ones(1, max_tokens - tokens[i].shape[1]) * -1, tokens[i]], dim=1)
-            batch_target_masks = torch.cat([torch.zeros(1, max_tokens - token_target_masks[i].shape[1]), token_target_masks[i]], dim=1)
+            token_embeddings[i] = torch.cat([torch.zeros(1, max_tokens - token_embeddings[i].shape[1], self.embed_dim), token_embeddings[i]], dim=1)
+            tokens[i] = torch.cat([torch.ones(1, max_tokens - tokens[i].shape[1]) * -1, tokens[i]], dim=1)
+            token_target_masks[i] = torch.cat([torch.zeros(1, max_tokens - token_target_masks[i].shape[1]), token_target_masks[i]], dim=1)
 
         # concat
         token_embeddings = torch.cat(token_embeddings, dim=0)
@@ -345,4 +344,16 @@ if __name__ == '__main__':
     }]
 
     output = model(inputs)
+    
+    # Mix of image+discrete and continuous+continuous
+    output = model([
+        {
+            'images': torch.randn(20, 3, 80, 64),
+            'discrete_actions': torch.randint(0, 55, (20, 1)),
+        },
+        {
+            'continuous': torch.randn(15, 8),
+            'continuous_actions': torch.randn(15, 4),
+        }
+    ])
     import pdb; pdb.set_trace()

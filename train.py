@@ -61,14 +61,14 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.1)
 
     parser.add_argument('--warmup_steps', type=int, default=15000)
-    parser.add_argument('--init_lr', type=float, default=1e-7)
-    parser.add_argument('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR
+    parser.add_argument('--init_lr', type=float, default=1e-7) # starting LR for warmup
+    parser.add_argument('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR after warmup
     
     parser.add_argument('--min_factor', type=float, default=10.0) # the minimum LR factor, e.g. w/ 10, base 1e-4 -> 1e-5 for Cosine Decay
     parser.add_argument('--disable_cosine_decay', action='store_true', default=False) # disable cosine decay
 
-    parser.add_argument('--training_steps', type=int, default=1_015_000)
-    parser.add_argument('--eval_freq', type=int, default=10_150)
+    parser.add_argument('--training_steps', type=int, default=1_000_000)
+    parser.add_argument('--eval_freq', type=int, default=100_000)
     
 
     # datasets / envs
