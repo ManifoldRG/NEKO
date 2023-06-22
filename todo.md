@@ -1,11 +1,9 @@
 todo:
 - verify/test ResNet patch embeddings
-- how to input grayscale (1 channel) input? (answer: repeat) (add wrapper)
-- prompting ()
+- add 1 channel image repeating in some place (in forward or when sampling from env?)
 
-implentation features: 
+things to add: 
 - stochastic depth
-- cosine lr schedule
 - currently supporting Box and Discrete spaces, implement others: https://gymnasium.farama.org/api/spaces/
 
 changes:
