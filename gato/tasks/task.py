@@ -10,4 +10,3 @@ class Task(ABC):
 
     def evaluate(self, model, n_iterations):
         pass        
-    

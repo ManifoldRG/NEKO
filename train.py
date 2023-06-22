@@ -28,6 +28,8 @@ def main(args):
             env.unwrapped.spec.id, 
             env, 
             dataset,
+            args = args,
+            context_len=args.sequence_length,
             training_prompt_len_proportion=args.prompt_len_proportion,
             share_prompt_episodes = not args.unique_prompt_episodes
         )
@@ -121,6 +123,7 @@ if __name__ == '__main__':
 
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=10)
+    parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
 
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])

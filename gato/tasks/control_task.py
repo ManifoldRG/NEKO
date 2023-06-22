@@ -17,20 +17,24 @@ def tokens_per_space(space):
         return 1
     else:
         raise NotImplementedError(f'Unsupported space: {space}')
-
+    
+   
 class ControlTask(Task):
     def __init__(
             self, 
             env_name: str, 
             env: gym.Env, 
             dataset: minari.MinariDataset, 
+            context_len: int,
+            args,
             training_prompt_len_proportion=0.5, 
-            share_prompt_episodes=True
+            share_prompt_episodes=True,
         ):
         super().__init__()
-        self.env_name = env_name
+        self.name = env_name
         self.env = env
         self.dataset = dataset
+        self.args = args
 
         self.action_type = type(self.env.action_space)
         self.observation_type = type(self.env.observation_space)
@@ -41,7 +45,8 @@ class ControlTask(Task):
         self.observation_tokens = tokens_per_space(self.env.observation_space)
 
         self.tokens_per_timestep =  self.action_tokens + self.observation_tokens + 1 # additional separator token
-        
+        assert context_len >= self.tokens_per_timestep, f'Context length must be at least {self.tokens_per_timestep} for env {env_name}'
+
         # If sampled episode needs a prompt, this specifies what proportion of tokens should be from the prompt
         self.training_prompt_len_proportion = training_prompt_len_proportion 
         assert self.training_prompt_len_proportion >= 0 and self.training_prompt_len_proportion <= 1
@@ -52,12 +57,20 @@ class ControlTask(Task):
         # Ways of sampling prompts
         self.prompt_types = ['start', 'end','uniform']
 
-        # observation, action strings
+        
         if type(self.env.observation_space) == gym.spaces.Box:
-            obs_str = 'continuous_obs'
+            if len(self.env.observation_space.shape) == 2 or len(self.env.observation_space.shape) == 3:
+                obs_str = 'images'
+            else:
+                obs_str = 'continuous_obs'
         elif type(self.env.observation_space) == gym.spaces.Discrete:
             obs_str = 'discrete_obs'
         self.obs_str = obs_str
+
+        if obs_str == 'images':
+            self.image_transform = ControlImageTransform(env, args.patch_size)
+        else:
+            self.image_transform = None
         
         if type(self.env.action_space) == gym.spaces.Box:
             action_str = 'continuous_actions'
@@ -65,7 +78,7 @@ class ControlTask(Task):
             action_str = 'discrete_actions'
         self.action_str = action_str
 
-    def evaluate(self, model, n_iterations):
+    def evaluate(self, model, n_iterations, deterministic=True):
         # serial evaluation
         returns = []
         ep_lens = []
@@ -83,21 +96,19 @@ class ControlTask(Task):
             ep_len = 0
             while not done:
                 # append new observation, and pad actions
-                input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], torch.tensor(observation, device=model.device).unsqueeze(0)], dim=0)
+                new_obs = torch.tensor(observation, device=model.device).unsqueeze(0)
+                if self.image_transform is not None:
+                    new_obs = self.image_transform.transform(new_obs)
+                input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
                 
-                # TODO, make sure right shape for discrete
-                
-                input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device)], dim=0)
-                # print(input_dict[self.action_str].shape)
-                # print(input_dict[self.obs_str].shape)
+                input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=input_dict[self.action_str].dtype)], dim=0)
                 
                 # trim to context length
                 input_dict[self.obs_str] = input_dict[self.obs_str][-context_timesteps:,]
                 input_dict[self.action_str] = input_dict[self.action_str][-context_timesteps:,]
 
-                action = model.predict_control(input_dict, task=self)
+                action = model.predict_control(input_dict, task=self, deterministic=deterministic)
                 input_dict[self.action_str][-1,] = action
-
                 observation, reward, terminated, truncated, info = self.env.step(action.cpu().numpy())
                 done = terminated or truncated
                 ep_return += reward 
@@ -234,17 +245,70 @@ class ControlTask(Task):
             elif type(self.env.observation_space) == gym.spaces.Discrete:
                 observations = torch.tensor(observations, dtype=torch.int32, device=device)
             
+            # apply image transforms
+            if self.image_transform is not None:
+                observations = self.image_transform.transform(observations)
+            
             # convert actions to tensors
             if type(self.env.action_space) == gym.spaces.Box:
                 actions = torch.tensor(actions, dtype=torch.float32, device=device)
             elif type(self.env.action_space) == gym.spaces.Discrete:
                 actions = torch.tensor(actions, dtype=torch.int32, device=device)
+            
+            # make sure actions are 2D
+            actions = actions.reshape(actions.shape[0], self.action_tokens)
 
             episode_dict = {
                 self.action_str: actions,
                 self.obs_str: observations,
             }
             episode_dicts.append(episode_dict)
-
         return episode_dicts
         
+
+
+class ControlImageTransform:
+    def __init__(self, env, patch_size=16):
+        self.env = env
+        self.patch_size = patch_size
+
+        assert type(self.env.observation_space) == gym.spaces.Box, 'Only supports Box observation space'
+        assert len(self.env.observation_space.shape) == 3 or len(self.env.observation_space.shape) == 2, 'Only supports 2D or 3D observation space'
+
+        self.channel_first = None
+        self.grayscale = False
+
+        # Check if grayscale or RGB
+        if len(self.env.observation_space.shape) == 3:
+            # Check if channel first or channel last
+            assert self.env.observation_space.shape[0] == 3 or self.env.observation_space.shape[-1] == 3, '3 channel first or channel last'
+            self.channel_first = self.env.observation_space.shape[0] == 3
+            if self.channel_first:
+                self.height = self.env.observation_space.shape[1]
+                self.width = self.env.observation_space.shape[2]
+            else:
+                self.height = self.env.observation_space.shape[0]
+                self.width = self.env.observation_space.shape[1]
+        else:
+            self.grayscale = True
+            self.height = self.env.observation_space.shape[0]
+            self.width = self.env.observation_space.shape[1]
+
+        # check how much padding is needed
+        self.padding_h = 0
+        self.padding_w = 0
+        if self.height % self.patch_size != 0:
+            self.padding_h = self.patch_size - (self.height % self.patch_size)
+        if self.width % self.patch_size != 0:
+            self.padding_w = self.patch_size - (self.width % self.patch_size)
+
+    def transform(self, images: torch.Tensor):
+        if self.grayscale:
+            images = images.reshape(-1, 1, self.height, self.width)
+            images = images.repeat(1, 3, 1, 1)
+        else:
+            if not self.channel_first:
+                images = images.permute(0, 3, 1, 2)
+        # all images now B X 3 X H X W, add padding:
+        images = torch.nn.functional.pad(images, (0, self.padding_w, 0, self.padding_h), value=0) # left, right, top, bottom padding
+        return images

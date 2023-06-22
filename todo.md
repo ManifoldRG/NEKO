@@ -1,13 +1,14 @@
 todo:
 - verify/test ResNet patch embeddings
-- add 1 channel image repeating in some place (in forward or when sampling from env?)
-- prompting style during inference
+- for prompting style during inference
+    - filter which episode to prompt with?
+- make image padding configurable?
 
 things to add: 
 - stochastic depth
-- currently supporting Box and Discrete spaces, implement others: https://gymnasium.farama.org/api/spaces/
+- currently supporting Box and Discrete spaces, implement others: https://gymnasium.farama.org/api/spaces/, like spaces.Text
 
-changes:
+Purposeful changes from Gato:
 - added gradient clipping (can be disabled)
 
 ideas:

@@ -20,7 +20,12 @@ cd ..
 python ./gato/data/download_custom_datasets.py
 ```
 
+Where datasets can be any string in download_custom_datasets.py or dataset in https://minari.farama.org/ with Box or Discrete observation or action spaces, although these environments have not been tested yet. 
+
 # Training
+Below are some example training commands. These have been at least tested for a few updates and evaluation to verify logical correctness, but full training runs may not have been performed. 
+
+
 ```bash
 python train.py --datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2
 ```
@@ -30,7 +35,9 @@ test, with toy size
 python train.py --embed_dim=128 --layers=2 --heads=4 --training_steps=1000 --log_eval_freq=10 --warmup_steps=100 --batch_size=4 -k=256
 ```
 
-
+```bash
+python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --log_eval_freq=1 --warmup_steps=100 --batch_size=4 -k=512 --eval_episodes=1 --device=cuda --datasets Breakout-expert_s0-v0
+``
 
 # Credits
 

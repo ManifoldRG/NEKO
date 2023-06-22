@@ -20,6 +20,7 @@ class Trainer:
         self.device = args.device
 
         self.min_lr = self.args.learning_rate / self.args.min_factor
+        self.deterministic = self.args.eval_mode == 'deterministic'
 
         self.steps = 0
         self.start_time = None
@@ -57,7 +58,7 @@ class Trainer:
         # loop over eval for each env
         with torch.no_grad():
             for task in self.tasks:
-                eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes)
+                eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/{task.name}/{k}'] = v
 

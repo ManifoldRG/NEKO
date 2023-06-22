@@ -143,7 +143,6 @@ class GatoPolicy(nn.Module):
             loss_masks = loss_masks.reshape(-1)
             loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0]
             target_tokens = target_tokens.reshape(-1)[loss_masks > 0]
-
             loss = torch.nn.functional.cross_entropy(loss_logits, target_tokens)
 
         else:
@@ -231,8 +230,8 @@ class GatoPolicy(nn.Module):
                 n_images = image_embeddings.shape[0]
                 n_patches = image_embeddings.shape[1]
                 #image_tokens = torch.ones(n_images, n_patches) * -1
-                image_tokens = torch.zeros(n_images, n_patches)
-                image_targets = torch.zeros(n_images, n_patches)
+                image_tokens = torch.zeros(n_images, n_patches, dtype=torch.long, device=self.device)
+                image_targets = torch.zeros(n_images, n_patches, device=self.device)
                 if n_timesteps is None:
                     n_timesteps = n_images
                 else:
@@ -241,7 +240,7 @@ class GatoPolicy(nn.Module):
             if 'continuous_obs' in batch and batch['continuous_obs'] is not None:
                 continuous_tokens = self.continuous_obs_tokenizer.encode(batch['continuous_obs'])
                 continuous_embeddings = self.embed_token(continuous_tokens)
-                continuous_targets = torch.zeros_like(continuous_tokens)
+                continuous_targets = torch.zeros_like(continuous_tokens, device=self.device)
 
                 if n_timesteps is None:
                     n_timesteps = continuous_tokens.shape[0]
@@ -251,7 +250,7 @@ class GatoPolicy(nn.Module):
             if 'discrete_obs' in batch and batch['discrete_obs'] is not None:
                 discrete_tokens = batch['discrete_obs']
                 discrete_embeddings = self.embed_token(discrete_tokens)
-                discrete_targets = torch.zeros_like(discrete_tokens)
+                discrete_targets = torch.zeros_like(discrete_tokens, device=self.device)
 
                 if n_timesteps is None:
                     n_timesteps = discrete_tokens.shape[0]
@@ -261,7 +260,7 @@ class GatoPolicy(nn.Module):
             if 'continuous_actions' in batch and batch['continuous_actions'] is not None:
                 continuous_action_tokens = self.continuous_action_tokenizer.encode(batch['continuous_actions'])
                 continuous_action_embeddings = self.embed_token(continuous_action_tokens)
-                continuous_action_targets = torch.ones_like(continuous_action_tokens)
+                continuous_action_targets = torch.ones_like(continuous_action_tokens, device=self.device)
                 
                 if n_timesteps is None:
                     n_timesteps = continuous_action_tokens.shape[0]
@@ -280,9 +279,9 @@ class GatoPolicy(nn.Module):
 
             
 
-            separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim) * self.separator_token
-            separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long)
-            separator_targets = torch.zeros(n_timesteps, 1, dtype=torch.long)
+            separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim, device=self.device) * self.separator_token
+            separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
+            separator_targets = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
             
             # interleave observation, action tokens,add separator
 
@@ -305,7 +304,6 @@ class GatoPolicy(nn.Module):
                 ], 
                 dim=1
             )
-
             # interleave embeddings, n_timesteps x n_tokens x embed_dim
             batch_embeddings = torch.cat(
                 [
@@ -318,7 +316,7 @@ class GatoPolicy(nn.Module):
 
             n_observation_tokens = batch_embeddings.shape[1] # number of tokens per timestep
             if self.use_pos_encoding:
-                inner_timestep_embeddings = self.pos_embed_observation(torch.arange(n_observation_tokens)).unsqueeze(0) # 1 x n_tokens x embed_dim
+                inner_timestep_embeddings = self.pos_embed_observation(torch.arange(n_observation_tokens, device=self.device)).unsqueeze(0) # 1 x n_tokens x embed_dim
                 # repeat for each timestep
                 inner_timestep_embeddings = inner_timestep_embeddings.repeat(n_timesteps, 1, 1)
                 batch_embeddings = batch_embeddings + inner_timestep_embeddings
@@ -344,11 +342,11 @@ class GatoPolicy(nn.Module):
         # (left pad) to max tokens
         for i in range(n_batches):
             # store which tokens are padding and which are real
-            token_masks.append(torch.cat([torch.zeros(1, max_tokens -  token_embeddings[i].shape[1]), torch.ones(1,  token_embeddings[i].shape[1])], dim=1))
+            token_masks.append(torch.cat([torch.zeros(1, max_tokens -  token_embeddings[i].shape[1], device=self.device), torch.ones(1,  token_embeddings[i].shape[1], device=self.device)], dim=1))
             
-            token_embeddings[i] = torch.cat([torch.zeros(1, max_tokens - token_embeddings[i].shape[1], self.embed_dim), token_embeddings[i]], dim=1)
-            tokens[i] = torch.cat([torch.zeros(1, max_tokens - tokens[i].shape[1], dtype=torch.long), tokens[i]], dim=1)
-            token_target_masks[i] = torch.cat([torch.zeros(1, max_tokens - token_target_masks[i].shape[1]), token_target_masks[i]], dim=1)
+            token_embeddings[i] = torch.cat([torch.zeros(1, max_tokens - token_embeddings[i].shape[1], self.embed_dim, device=self.device), token_embeddings[i]], dim=1)
+            tokens[i] = torch.cat([torch.zeros(1, max_tokens - tokens[i].shape[1], dtype=torch.long, device=self.device), tokens[i]], dim=1)
+            token_target_masks[i] = torch.cat([torch.zeros(1, max_tokens - token_target_masks[i].shape[1], device=self.device), token_target_masks[i]], dim=1)
 
         # concat
         token_embeddings = torch.cat(token_embeddings, dim=0)
@@ -371,9 +369,13 @@ class GatoPolicy(nn.Module):
         elif action_type == gym.spaces.Box:
             action_str = 'continuous'
         
-        #valid_predicted_tokens = torch.arange(start=self.token_starts[action_str], end=self.token_ends[action_str] + 1, device=self.device) 
         start_token = self.token_starts[action_str]
         end_token = self.token_ends[action_str]
+
+        # further restrict end_token if discrete action
+        if action_str == 'discrete':
+            assert task.env.action_space.n <= self.discrete_tokens, "discrete action space too large for model"
+            end_token = start_token + task.env.action_space.n - 1
 
         token_embeddings, _, _, token_masks = self.tokenize_input_dicts([input])
 
@@ -409,7 +411,7 @@ class GatoPolicy(nn.Module):
 
         # convert tokens back to actions
         if action_type == gym.spaces.Discrete:
-            action = predicted_tokens[0] - self.token_starts[action_str]
+            action = predicted_tokens[0] - start_token
         else:
             predicted_tokens = torch.stack(predicted_tokens, dim=0)
             action = self.continuous_action_tokenizer.decode(predicted_tokens)
@@ -418,6 +420,7 @@ class GatoPolicy(nn.Module):
 
 if __name__ == '__main__':
     model = GatoPolicy(
+        device='cpu',
         embed_dim=128,
         layers=2,
         heads=4,
