@@ -24,7 +24,14 @@ def main(args):
 
     tasks = []
     for env, dataset in zip(envs, datasets):
-        task = ControlTask(env.unwrapped.spec.id, env, dataset)
+        task = ControlTask(
+            env.unwrapped.spec.id, 
+            env, 
+            dataset,
+            training_prompt_len_proportion=args.prompt_len_proportion,
+            share_prompt_episodes = not args.unique_prompt_episodes
+        )
+        import pdb; pdb.set_trace()
         tasks.append(task)
 
     raise NotImplementedError('TODO, update policy args')
@@ -77,6 +84,9 @@ if __name__ == '__main__':
     parser.add_argument('--adam_eps', type=float, default=1e-8)
     parser.add_argument('--weight_decay', type=float, default=0.1)
 
+    parser.add_argument('--grad_norm_clip', type=float, default=1.0)
+    parser.add_argument('--disable_grad_clip', action='store_true', default=False)
+
     parser.add_argument('--warmup_steps', type=int, default=15000)
     parser.add_argument('--init_lr', type=float, default=1e-7) # starting LR for warmup
     parser.add_argument('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR after warmup
@@ -91,6 +101,11 @@ if __name__ == '__main__':
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
 
+    # params for sampling from datasets
+    parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
+    parser.add_argument('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
+    parser.add_argument('--unique_prompt_episodes', type=bool, default=False, action='store_true')
+
 
     # logging
     parser.add_argument('--use_wandb', '-w', action='store_true', default=False)
@@ -100,9 +115,13 @@ if __name__ == '__main__':
     args = DotDict(vars(args))
 
     # Checks
-    assert args.training_steps % args.eval_freq == 0, 'training_steps must be divisible by eval_freq'
+    assert args.training_steps % args.log_eval_freq == 0, 'training_steps must be divisible by eval_freq'
     assert args.training_steps > args.warmup_steps, 'training_steps must be greater than warmup_steps'
     assert args.learning_rate > args.init_lr, 'learning_rate must be greater than init_lr'
+
+    # make sure proportions are between 0 and 1
+    assert 0 <= args.prompt_ep_proportion <= 1, 'prompt_ep_proportion must be between 0 and 1'
+    assert 0 <= args.prompt_len_proportion <= 1, 'prompt_len_proportion must be between 0 and 1'
 
 
     main(args)
