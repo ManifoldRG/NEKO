@@ -31,14 +31,21 @@ def main(args):
             training_prompt_len_proportion=args.prompt_len_proportion,
             share_prompt_episodes = not args.unique_prompt_episodes
         )
-        import pdb; pdb.set_trace()
         tasks.append(task)
 
-    raise NotImplementedError('TODO, update policy args')
     model = GatoPolicy(
+        embed_dim=args.embed_dim,
+        layers=args.layers,
+        heads=args.heads,
+        dropout=args.dropout,
+        mu=args.mu,
+        M=args.M,
+        patch_size=args.patch_size,
+        resid_mid_channels=args.resid_mid_channels,
         continuous_tokens=args.continuous_tokens,
         discrete_tokens=args.discrete_tokens
-    ) # TODO
+    )
+    model = model.to(args.device)
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -61,11 +68,21 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    # Input & tokenization
-    parser.add_argument('--patch_size', type=int, default=16) # image patch size
-    parser.add_argument('--sequence_length', type=int, default=1024) # number of tokens in seq
+    parser.add_argument('--device', type=str, default='cpu') # e.g. cuda:0
 
-    parser.add_argument('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
+    # Input & tokenization
+    parser.add_argument('--sequence_length', type=int, default=1024) # number of tokens in seq
+    parser.add_argument('--patch_size', type=int, default=16) # image patch size
+    parser.add_argument('--resid_mid_channels', type=int, default=128) # number of channels in residual MLP
+    parser.add_argument('--num_groups', type=int, default=32) # GroupNorm groups in ResNet
+    parser.add_argument('--patch_position_vocab_size', type=int, default=128)
+    parser.add_argument('--disable_patch_pos_encoding', action='store_true', default=False)
+    parser.add_argument('--disable_inner_pos_encoding', action='store_true', default=False)
+
+    parser.add_argument('--mu','-mu', type=int, default=100) # mu-law encoding
+    parser.add_argument('--M', '-M', type=int, default=256) 
+
+    #parser.add_argument('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
     parser.add_argument('--continuous_tokens', type=int, default=1024) # number of tokens for continuous values (e.g. actions, observations)
     parser.add_argument('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
 
@@ -73,7 +90,6 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dim', type=int, default=768)
     parser.add_argument('--layers', type=int, default=8)
     parser.add_argument('--heads', type=int, default=24)
-
 
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=512)

@@ -47,7 +47,11 @@ class ControlTask(Task):
         # Specifies if prompt should come from the same episode as the main chunk
         self.share_prompt_episodes = share_prompt_episodes
         # Ways of sampling prompts
-        self.prompt_types = ['start', 'end','uniform'] 
+        self.prompt_types = ['start', 'end','uniform']
+
+    # TODO
+    def evaluate(self, model, n_iterations):
+        return {}
     
     def sample_batch(self, vanilla_batch_size:int , prompted_batch_sizes: dict, device, max_tokens=1024):
         for prompt_type in prompt_types:

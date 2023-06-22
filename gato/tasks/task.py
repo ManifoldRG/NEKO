@@ -8,6 +8,6 @@ class Task(ABC):
     def sample_batch(self, vanilla_batch_size, prompted_batch_size, device, max_tokens=1024):
         pass
 
-    def eval(self, model, n_iterations):
+    def evaluate(self, model, n_iterations):
         pass        
     

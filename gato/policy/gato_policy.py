@@ -21,7 +21,7 @@ class GatoPolicy(nn.Module):
         M: int = 256,
 
         patch_size: int = 16,
-        resid_mid_channels: int = 128,
+        resid_mid_channels: int = 132,
         num_groups: int = 32,
         position_vocab_size: int = 128,
         continuous_tokens: int = 1024,
@@ -366,15 +366,15 @@ if __name__ == '__main__':
 
     #output = model(inputs)
     
-    # Mix of image+discrete and continuous+continuous
+    # Mix of image+discrete and continuous+continuous, and compute loss
     output = model([
-        # {
-        #     'images': torch.randn(20, 3, 80, 64),
-        #     'discrete_actions': torch.randint(0, 55, (20, 1)),
-        # },
+        {
+            'images': torch.randn(20, 3, 80, 64),
+            'discrete_actions': torch.randint(0, 55, (20, 1)),
+        },
         {
             'continuous_obs': torch.randn(15, 8),
             'continuous_actions': torch.randn(15, 4),
         }
     ], compute_loss=True)
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
