@@ -1,6 +1,6 @@
 (In Progress)
 
-Goal: working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation for control tasks.
+Goal: working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation for control tasks to be used for [Manifold's Neko](https://github.com/ManifoldRG), or other projects.
 
 
 # Setup
