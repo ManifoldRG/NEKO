@@ -48,39 +48,62 @@ class ControlTask(Task):
         
         # Specifies if prompt should come from the same episode as the main chunk
         self.share_prompt_episodes = share_prompt_episodes
+
         # Ways of sampling prompts
         self.prompt_types = ['start', 'end','uniform']
 
-    # TODO
+        # observation, action strings
+        if type(self.env.observation_space) == gym.spaces.Box:
+            obs_str = 'continuous_obs'
+        elif type(self.env.observation_space) == gym.spaces.Discrete:
+            obs_str = 'discrete_obs'
+        self.obs_str = obs_str
+        
+        if type(self.env.action_space) == gym.spaces.Box:
+            action_str = 'continuous_actions'
+        elif type(self.env.action_space) == gym.spaces.Discrete:
+            action_str = 'discrete_actions'
+        self.action_str = action_str
+
     def evaluate(self, model, n_iterations):
         # serial evaluation
         returns = []
         ep_lens = []
         metrics = {}
 
+        context_timesteps = model.context_len // self.tokens_per_timestep # amount of timesteps that fit into context
+
         for i in range(n_iterations):
             observation, info = self.env.reset()
 
             # sample prompt
-            input_dict = self.sample_batch_configurable(self, batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = 1024, share_prompt_episodes=True)[0]
-
+            input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True)[0]
             done = False
             ep_return = 0
+            ep_len = 0
             while not done:
                 # append new observation, and pad actions
-                input_dict['observations'] = np.concatenate([input_dict['observations'], observation], axis=0)
+                input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], torch.tensor(observation, device=model.device).unsqueeze(0)], dim=0)
+                
                 # TODO, make sure right shape for discrete
-                input_dict['actions'] = np.concatenate([input_dict['actions'], np.zeros(1, self.action_tokens)], axis=0)
+                
+                input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device)], dim=0)
+                # print(input_dict[self.action_str].shape)
+                # print(input_dict[self.obs_str].shape)
+                
+                # trim to context length
+                input_dict[self.obs_str] = input_dict[self.obs_str][-context_timesteps:,]
+                input_dict[self.action_str] = input_dict[self.action_str][-context_timesteps:,]
 
-                action = model.predict_control(input_dict, task=self).cpu().numpy()
-                input_dict['actions'][-1,] = action
+                action = model.predict_control(input_dict, task=self)
+                input_dict[self.action_str][-1,] = action
 
-                observation, reward, terminated, truncated, info = self.env.step(action)
+                observation, reward, terminated, truncated, info = self.env.step(action.cpu().numpy())
                 done = terminated or truncated
                 ep_return += reward 
-                ep_lens += 1
+                ep_len += 1
             returns.append(ep_return)
-            ep_lens.append(ep_lens)
+            ep_lens.append(ep_len)
 
         metrics['mean_return'] = np.mean(returns)
         metrics['mean_episode_len'] = np.mean(ep_lens)
@@ -208,22 +231,18 @@ class ControlTask(Task):
             # convert observations to tensors
             if type(self.env.observation_space) == gym.spaces.Box:
                 observations = torch.tensor(observations, dtype=torch.float32, device=device)
-                obs_str = 'continuous_obs'
             elif type(self.env.observation_space) == gym.spaces.Discrete:
                 observations = torch.tensor(observations, dtype=torch.int32, device=device)
-                obs_str = 'discrete_obs'
             
             # convert actions to tensors
             if type(self.env.action_space) == gym.spaces.Box:
                 actions = torch.tensor(actions, dtype=torch.float32, device=device)
-                action_str = 'continuous_actions'
             elif type(self.env.action_space) == gym.spaces.Discrete:
                 actions = torch.tensor(actions, dtype=torch.int32, device=device)
-                action_str = 'discrete_actions'
 
             episode_dict = {
-                action_str: actions,
-                obs_str: observations,
+                self.action_str: actions,
+                self.obs_str: observations,
             }
             episode_dicts.append(episode_dict)
 

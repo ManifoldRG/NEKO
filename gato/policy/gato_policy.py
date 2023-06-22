@@ -45,21 +45,21 @@ class GatoPolicy(nn.Module):
         self.context_len = context_len
         # this is a dummy value as this implementation does not yet handle language IO
         self.text_tokens = 32000 # SentencePiece vocab size
-        self.continous_tokens = continuous_tokens
+        self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
-        self.vocab_size = self.text_tokens + self.discrete_tokens + self.continous_tokens
+        self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
         
-        # order of text, continous, discrete
+        # order of text, continuous, discrete
         self.token_starts = {
             'text': 0,
-            'continous': self.text_tokens,
-            'discrete': self.text_tokens + self.continous_tokens
+            'continuous': self.text_tokens,
+            'discrete': self.text_tokens + self.continuous_tokens
         }
 
         self.token_ends = {
             'text': self.text_tokens - 1,
-            'continous': self.text_tokens + self.continous_tokens - 1,
-            'discrete': self.text_tokens + self.continous_tokens + self.discrete_tokens - 1
+            'continuous': self.text_tokens + self.continuous_tokens - 1,
+            'discrete': self.text_tokens + self.continuous_tokens + self.discrete_tokens - 1
         }
 
 
@@ -85,11 +85,11 @@ class GatoPolicy(nn.Module):
         self.text_tokenizer = None # e.g. SentencePiece
 
         self.continuous_action_tokenizer = ContinuousTokenizer(
-            use_mu_law=False, mu=mu, M=M, n_bins=self.continous_tokens, offset=self.token_starts['continous']
+            use_mu_law=False, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
         ) # continuous actions expected to be in [-1, 1]
         
         self.continuous_obs_tokenizer = ContinuousTokenizer(
-            use_mu_law=True, mu=mu, M=M, n_bins=self.continous_tokens, offset=self.token_starts['continous']
+            use_mu_law=True, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
         ) # continuous actions expected to be in [-1, 1]
 
 
@@ -114,7 +114,7 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs=None, compute_loss=False, **kwargs):
+    def forward(self, inputs: list[dict] = None, compute_loss=False, **kwargs):
         # tokenize inputs
         if inputs is not None:
             token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
@@ -152,7 +152,7 @@ class GatoPolicy(nn.Module):
         return logits, loss
 
 
-    def tokenize_input_dicts(self, inputs):
+    def tokenize_input_dicts(self, inputs: list[dict]):
         """"
         inputs: list of dicts for each batch
         [
@@ -359,7 +359,7 @@ class GatoPolicy(nn.Module):
     
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
-    def predict_control(self, inputs: dict, task: ControlTask, deterministic: bool = True):
+    def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
         # expects that inputs['continuous_actions'] or inputs['discrete_actions'] are padded by 1 timestep
         
         action_type = task.action_type # continuous or discrete
@@ -371,29 +371,49 @@ class GatoPolicy(nn.Module):
         elif action_type == gym.spaces.Box:
             action_str = 'continuous'
         
-        valid_predicted_tokens = torch.arange(start=self.token_starts[action_str], end=self.token_ends[action_str] + 1, device=self.device) 
-        
-        token_embeddings, _, _, token_masks = self.embed_inputs(inputs)
+        #valid_predicted_tokens = torch.arange(start=self.token_starts[action_str], end=self.token_ends[action_str] + 1, device=self.device) 
+        start_token = self.token_starts[action_str]
+        end_token = self.token_ends[action_str]
+
+        token_embeddings, _, _, token_masks = self.tokenize_input_dicts([input])
 
         # remove last action_tokens tokens, which are padding
+
         token_embeddings = token_embeddings[:, :-action_tokens, :]
         token_masks = token_masks[:, :-action_tokens]
-
+        
         predicted_tokens = []
+
         # predict tokens, sampling or deterministically picking best token
         for i in range(action_tokens):
             logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+            # extract valid logits from last timestep
+            logits = logits[0, -1, start_token:(end_token+1)]
             if deterministic:
-                # get most likely token, which is also a valid_predicted_tokens
-                import pdb; pdb.set_trace()
-                pass
-        
+                token = torch.argmax(logits, dim=-1)
+            else:
+                # sample from logits
+                probs = torch.nn.functional.softmax(logits, dim=-1)
+                token = torch.multinomial(probs, num_samples=1)[0]
+            token += start_token
+
+            # append to token_embeddings and token_masks
+            token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
+            new_embedding = self.embed_token(token) # check shape of new_emebddingss
+            token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
+            # and trim to context len
+            token_embeddings = token_embeddings[:, -self.context_len:, :]
+            token_masks = token_masks[:, -self.context_len:]
+            predicted_tokens.append(token)
+
+
         # convert tokens back to actions
         if action_type == gym.spaces.Discrete:
-            action = predicted_tokens[0]
+            action = predicted_tokens[0] - self.token_starts[action_str]
         else:
+            predicted_tokens = torch.stack(predicted_tokens, dim=0)
             action = self.continuous_action_tokenizer.decode(predicted_tokens)
-        
+
         return action
 
 if __name__ == '__main__':

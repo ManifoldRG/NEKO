@@ -1,7 +1,7 @@
 todo:
 - verify/test ResNet patch embeddings
 - add 1 channel image repeating in some place (in forward or when sampling from env?)
-- gpu
+- prompting style during inference
 
 things to add: 
 - stochastic depth
