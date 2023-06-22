@@ -43,7 +43,10 @@ def main(args):
         patch_size=args.patch_size,
         resid_mid_channels=args.resid_mid_channels,
         continuous_tokens=args.continuous_tokens,
-        discrete_tokens=args.discrete_tokens
+        discrete_tokens=args.discrete_tokens,
+        context_len=args.sequence_length,
+        use_patch_pos_encoding=not args.disable_patch_pos_encoding,
+        use_pos_encoding=not args.disable_inner_pos_encoding,
     )
     model = model.to(args.device)
 
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cpu') # e.g. cuda:0
 
     # Input & tokenization
-    parser.add_argument('--sequence_length', type=int, default=1024) # number of tokens in seq
+    parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
     parser.add_argument('--patch_size', type=int, default=16) # image patch size
     parser.add_argument('--resid_mid_channels', type=int, default=128) # number of channels in residual MLP
     parser.add_argument('--num_groups', type=int, default=32) # GroupNorm groups in ResNet
@@ -112,7 +115,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_steps', type=int, default=1_000_000)
     parser.add_argument('--log_eval_freq', type=int, default=100_000)
-    
+
+    # evaluation
+    parser.add_argument('--eval_episodes', type=int, default=10)
 
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
@@ -120,7 +125,7 @@ if __name__ == '__main__':
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
     parser.add_argument('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
-    parser.add_argument('--unique_prompt_episodes', type=bool, default=False, action='store_true')
+    parser.add_argument('--unique_prompt_episodes', default=False, action='store_true')
 
 
     # logging

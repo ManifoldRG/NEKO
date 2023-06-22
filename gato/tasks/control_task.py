@@ -54,8 +54,6 @@ class ControlTask(Task):
         return {}
     
     def sample_batch(self, vanilla_batch_size:int , prompted_batch_sizes: dict, device, max_tokens=1024):
-        for prompt_type in prompt_types:
-            assert prompt_type in self.prompt_types
 
         episode_dicts = []
 
@@ -78,7 +76,6 @@ class ControlTask(Task):
             prompt_types += [prompt_type] * prompt_batch_size
         
         assert len(prompt_propotions) == batch_size and len(prompt_types) == batch_size, f'Batch size mismatch: {len(prompt_propotions)} != {batch_size} or {len(prompt_types)} != {batch_size}'
-
         episode_dicts = self.sample_batch_configurable(
             batch_size,
             device,
@@ -125,13 +122,14 @@ class ControlTask(Task):
             timesteps_for_mains.append(timesteps_for_main) # max main size
             timesteps_for_prompts.append(num_timesteps - timesteps_for_main) # max prompt size
 
-            if timesteps_for_main >= len(episode):
+            ep_len = episode.total_timesteps
+            if timesteps_for_main >= ep_len:
                 # sample entire episode
                 start = 0
-                end = len(episode) - 1
+                end = ep_len - 1
             else:
                 # sample which timestep to start with
-                start = np.random.randint(0, len(episode) - timesteps_for_main)
+                start = np.random.randint(0, ep_len - timesteps_for_main)
                 end = start + timesteps_for_main
             observations = episode.observations[start:end,]
             actions = episode.actions[start:end,]
@@ -141,7 +139,7 @@ class ControlTask(Task):
 
         # add prompt
         for i, episode in enumerate(prompt_episodes):
-            ep_len = len(episode)
+            ep_len = episode.total_timesteps
             timesteps_for_prompt = timesteps_for_prompts[i]
             prompt_type = prompt_types[i]
             if timesteps_for_prompt > 0:

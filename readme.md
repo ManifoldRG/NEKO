@@ -25,6 +25,12 @@ python ./gato/data/download_custom_datasets.py
 python train.py --datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2
 ```
 
+test, with toy size
+```bash
+python train.py --embed_dim=128 --layers=2 --heads=4 --training_steps=1000 --log_eval_freq=10 --warmup_steps=100 --batch_size=4 -k=256
+```
+
+
 
 # Credits
 

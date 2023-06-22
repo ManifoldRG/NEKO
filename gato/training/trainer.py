@@ -16,14 +16,17 @@ class Trainer:
         self.optimizer = optimizer
         self.tasks = tasks
         self.args = args
-        self.print_logs = args.print_logs
+        self.print_logs = True # args.print_logs
+        self.device = args.device
 
         self.min_lr = self.args.learning_rate / self.args.min_factor
 
         self.steps = 0
+        self.start_time = None
     
     def train(self):
-        iters = self.training_steps // self.args.log_eval_freq
+        self.start_time = time.time()
+        iters = self.args.training_steps // self.args.log_eval_freq
         for i in range(iters):
             logs = self.train_iteration(self.args.log_eval_freq, i)
             if self.args.use_wandb:
@@ -53,7 +56,7 @@ class Trainer:
         
         # loop over eval for each env
         for task in self.tasks:
-            eval_logs = task.evaluate(self.model)
+            eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes)
             for k, v in eval_logs.items():
                 logs[f'evaluation/{task.name}/{k}'] = v
 
@@ -77,7 +80,7 @@ class Trainer:
         init_lr = self.args.init_lr
 
         # Calculate learning rate relative to current step
-        lr = linear_warmup_cosine_decay(self.steps, self.args.warmup_steps, base_lr, min_lr, init_lr, disable_cosine_decay=self.args.disable_cosine_decay)
+        lr = linear_warmup_cosine_decay(self.steps, self.args.warmup_steps, self.args.training_steps, base_lr, init_lr, min_lr, disable_cosine_decay=self.args.disable_cosine_decay)
         logs['training/learning_rate'] = lr
 
         # Apply
@@ -98,44 +101,44 @@ class Trainer:
 
         return loss.detach().cpu().item(), logs
 
-def sample_control_batch(self, batch_size):
-    batch_dicts = []
+    def sample_control_batch(self, batch_size):
+        batch_dicts = []
 
-    sampled_task_indices = []
-    n_tasks = len(self.tasks)
-    while len(sampled_task_indices) < self.batch_size:
-        max_n = min(n_tasks, self.batch_size - len(sampled_task_indices))
-        new_tasks = np.random.choice(np.arange(n_tasks), size=max_n, replace=False).tolist()
-        sampled_task_indices.extend(new_tasks)
+        sampled_task_indices = []
+        n_tasks = len(self.tasks)
+        while len(sampled_task_indices) < batch_size:
+            max_n = min(n_tasks, batch_size - len(sampled_task_indices))
+            new_tasks = np.random.choice(np.arange(n_tasks), size=max_n, replace=False).tolist()
+            sampled_task_indices.extend(new_tasks)
 
-    n_prompted_episodes = round(self.batch_size * self.args.prompt_ep_proportion)
-    vanilla_batch_size = self.batch_size - n_prompted_episodes
+        n_prompted_episodes = round(batch_size * self.args.prompt_ep_proportion)
+        vanilla_batch_size = batch_size - n_prompted_episodes
 
-    # determine prompted episodes and their prompting type (end or uniform)
-    prompt_indices = np.random.choice(self.batch_size, size=n_prompted_episodes, replace=False).tolist()
-    end_indices = np.random.choice(prompt_indices, size=round(len(prompt_indices) / 2), replace=False).tolist()
-    uniform_indices = [i for i in prompt_indices if i not in end_indices]
+        # determine prompted episodes and their prompting type (end or uniform)
+        prompt_indices = np.random.choice(batch_size, size=n_prompted_episodes, replace=False).tolist()
+        end_indices = np.random.choice(prompt_indices, size=round(len(prompt_indices) / 2), replace=False).tolist()
+        uniform_indices = [i for i in prompt_indices if i not in end_indices]
 
 
-    # aggregate acrosss tasks sampled multiple times
-    for i, task in enumerate(self.tasks):
-        total_task_batch_size = 0
-        task_vanilla_batch_size = 0
-        task_prompted_batch_sizes = {}
-        for type_index, task_index in enumerate(sampled_task_indices):
-            if task_index == i:
-                total_task_batch_size += 1
-                if type_index in end_indices:
-                    task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
-                elif type_index in uniform_indices:
-                    task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
-                else:
-                    task_vanilla_batch_size += 1
-            # sample episodes from dataset
-            if total_task_batch_size > 0:
-                task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.max_tokens)
-                batch_dicts.extend(task_episode_dicts)
-    return batch_dicts   
+        # aggregate acrosss tasks sampled multiple times
+        for i, task in enumerate(self.tasks):
+            total_task_batch_size = 0
+            task_vanilla_batch_size = 0
+            task_prompted_batch_sizes = {}
+            for type_index, task_index in enumerate(sampled_task_indices):
+                if task_index == i:
+                    total_task_batch_size += 1
+                    if type_index in end_indices:
+                        task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
+                    elif type_index in uniform_indices:
+                        task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
+                    else:
+                        task_vanilla_batch_size += 1
+                # sample episodes from dataset
+                if total_task_batch_size > 0:
+                    task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
+                    batch_dicts.extend(task_episode_dicts)
+        return batch_dicts   
 
 def linear_warmup_cosine_decay(current_step, warmup_steps, max_steps, base_lr, init_lr, min_lr, disable_cosine_decay=False):
     # Linear Warmup from init_lr to base_lr over warmup_steps
