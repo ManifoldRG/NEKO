@@ -51,7 +51,30 @@ class ControlTask(Task):
 
     # TODO
     def evaluate(self, model, n_iterations):
-        return {}
+        # serial evaluation
+        returns = []
+        ep_lens = []
+        metrics = {}
+
+        for i in range(n_iterations):
+            observation, info = self.env.reset()
+
+            # sample prompt
+            prompt_dict = self.sample_batch_configurable(self, batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = 1024, share_prompt_episodes=True)[0]
+
+            done = False
+            ep_return = 0
+            while not done:
+                observation, reward, terminated, truncated, info = self.env.step(action)
+                done = terminated or truncated
+                ep_return += reward 
+                ep_lens += 1
+            returns.append(ep_return)
+            ep_lens.append(ep_lens)
+
+        metrics['mean_return'] = np.mean(returns)
+        metrics['mean_episode_len'] = np.mean(ep_lens)
+        return metrics
     
     def sample_batch(self, vanilla_batch_size:int , prompted_batch_sizes: dict, device, max_tokens=1024):
 
