@@ -1,15 +1,33 @@
 import argparse
+import random
 
+import wandb
 import torch
 
-from utils import DotDict
+from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
+from gato.tasks.control_task import ControlTask
 
 def main(args):
-    envs, datasets = load_envs(args.datasets)
+    exp_id = random.randint(int(1e5), int(1e6) - 1)
+    exp_name = f'gato-control-{exp_id}'
+    if args.use_wandb:
+        wandb.init(
+            name = exp_name,
+            project=args.wandb_project,
+            config=args,
+        )
 
+    envs, datasets = load_envs(args.datasets) # Load Minari datasets and corresponding Gym environments
+
+    tasks = []
+    for env, dataset in zip(envs, datasets):
+        task = ControlTask(env.unwrapped.spec.id, env, dataset)
+        tasks.append(task)
+
+    raise NotImplementedError('TODO, update policy args')
     model = GatoPolicy(
         continuous_tokens=args.continuous_tokens,
         discrete_tokens=args.discrete_tokens
@@ -26,11 +44,11 @@ def main(args):
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
+        tasks = tasks,
+        args=args
     )
 
     trainer.train()
-
-    ## save, TODO
 
 
 if __name__ == '__main__':
@@ -48,7 +66,6 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dim', type=int, default=768)
     parser.add_argument('--layers', type=int, default=8)
     parser.add_argument('--heads', type=int, default=24)
-    parser.add_argument('--embed_dim', type=int, default=768)
 
 
     # training hyperparameters
@@ -68,11 +85,16 @@ if __name__ == '__main__':
     parser.add_argument('--disable_cosine_decay', action='store_true', default=False) # disable cosine decay
 
     parser.add_argument('--training_steps', type=int, default=1_000_000)
-    parser.add_argument('--eval_freq', type=int, default=100_000)
+    parser.add_argument('--log_eval_freq', type=int, default=100_000)
     
 
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
+
+
+    # logging
+    parser.add_argument('--use_wandb', '-w', action='store_true', default=False)
+    parser.add_argument('--wandb_project', type=str, default='gato-control')
     
     args = parser.parse_args()
     args = DotDict(vars(args))

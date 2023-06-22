@@ -1,5 +1,6 @@
 import time
 
+import wandb
 import numpy as np
 
 class Trainer:
@@ -7,16 +8,25 @@ class Trainer:
         self,
         model,
         optimizer,
+        tasks,
         args
     ):
         self.model = model
         self.optimizer = optimizer
+        self.tasks = tasks
         self.args = args
         self.print_logs = args.print_logs
 
         self.min_lr = self.args.learning_rate / self.args.min_factor
 
         self.steps = 0
+    
+    def train(self):
+        iters = self.training_steps // self.args.log_eval_freq
+        for i in range(iters):
+            logs = self.train_iteration(self.args.log_eval_freq, i)
+            if self.args.use_wandb:
+                wandb.log(logs)
     
     def train_iteration(self, num_steps, iter):
         logs = {}
@@ -41,7 +51,10 @@ class Trainer:
         self.model.eval()
         
         # loop over eval for each env
-        # TODO
+        for task in self.tasks:
+            eval_logs = task.evaluate(self.model)
+            for k, v in eval_logs.items():
+                logs[f'evaluation/{task.name}/{k}'] = v
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
@@ -74,6 +87,7 @@ class Trainer:
 
 
         return loss, logs
+
 def linear_warmup_cosine_decay(current_step, warmup_steps, max_steps, base_lr, init_lr, min_lr, disable_cosine_decay=False):
     # Linear Warmup from init_lr to base_lr over warmup_steps
     if current_step <= warmup_steps:
@@ -85,8 +99,6 @@ def linear_warmup_cosine_decay(current_step, warmup_steps, max_steps, base_lr, i
     else:
         lr = base_lr
     return lr
-
-
 
 
 if __name__ == '__main__':

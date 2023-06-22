@@ -1,6 +1,5 @@
 import minari
-#from gato.envs.atari import load_atari_env
-from atari import load_atari_env
+from gato.envs.atari import load_atari_env
 
 custom_env_loaders = {
     'ALE/': load_atari_env

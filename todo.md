@@ -1,8 +1,9 @@
 todo:
 - verify/test ResNet patch embeddings
-- how to input grayscale (1 channel) input? (answer: repeat)
+- how to input grayscale (1 channel) input? (answer: repeat) (add wrapper)
+- prompting ()
 
-implentation features:
+implentation features: 
 - stochastic depth
 - cosine lr schedule
 - currently supporting Box and Discrete spaces, implement others: https://gymnasium.farama.org/api/spaces/

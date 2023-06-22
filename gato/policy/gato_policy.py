@@ -34,8 +34,6 @@ class GatoPolicy(nn.Module):
         
 
     ):
-        # TODO, add option for disabling positional embeddings
-
         super().__init__()
 
         self.context_len = context_len
@@ -103,13 +101,35 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs):
+    def forward(self, inputs, compute_loss=False):
         batch_size = len(inputs)
         token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
 
         # pass to transformer
-        output = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
-        return output
+        final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
+
+        # predict logits
+        logits = self.predict_token(final_representations)
+
+        if compute_loss:
+            # obtain target tokens, and pad
+            loss_logits = logits[:, :-1, :]
+            token_masks = token_masks[:, :-1] # whether originating token is valid
+
+            token_target_masks = token_target_masks[:, 1:] # whether target token is valid
+            loss_masks = token_masks * token_target_masks
+            target_tokens = tokens[:, 1:]
+
+            loss_masks = loss_masks.reshape(-1)
+            loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0]
+            target_tokens = target_tokens.reshape(-1)[loss_masks > 0]
+
+            loss = torch.nn.functional.cross_entropy(loss_logits, target_tokens)
+
+        else:
+            loss = None
+        
+        return logits, loss
 
 
     def tokenize_input_dicts(self, inputs):
@@ -120,8 +140,8 @@ class GatoPolicy(nn.Module):
                 # observations
                 text: T x L  or None
                 images: T x 3 x H x W or None
-                continuous: T x C or None # continuous vector observations
-                discrete: T x D or None   # discrete observations
+                continuous_obs: T x C or None # continuous vector observations
+                discrete_obs: T x D or None   # discrete observations
 
                 # actions
                 continuous_actions: T x A or None
@@ -190,15 +210,16 @@ class GatoPolicy(nn.Module):
                 image_embeddings = self.image_embedding(batch['images']) # n_timesteps x n_patches x embed_dim
                 n_images = image_embeddings.shape[0]
                 n_patches = image_embeddings.shape[1]
-                image_tokens = torch.ones(n_images, n_patches) * -1
+                #image_tokens = torch.ones(n_images, n_patches) * -1
+                image_tokens = torch.zeros(n_images, n_patches)
                 image_targets = torch.zeros(n_images, n_patches)
                 if n_timesteps is None:
                     n_timesteps = n_images
                 else:
                     assert n_timesteps == n_images, "number of timesteps must be the same for all modalities"
             
-            if 'continuous' in batch and batch['continuous'] is not None:
-                continuous_tokens = self.continuous_obs_tokenizer.encode(batch['continuous'])
+            if 'continuous_obs' in batch and batch['continuous_obs'] is not None:
+                continuous_tokens = self.continuous_obs_tokenizer.encode(batch['continuous_obs'])
                 continuous_embeddings = self.embed_token(continuous_tokens)
                 continuous_targets = torch.zeros_like(continuous_tokens)
 
@@ -207,8 +228,8 @@ class GatoPolicy(nn.Module):
                 else:
                     assert n_timesteps == continuous_tokens.shape[0], "number of timesteps must be the same for all modalities"
             
-            if 'discrete' in batch and batch['discrete'] is not None:
-                discrete_tokens = batch['discrete']
+            if 'discrete_obs' in batch and batch['discrete_obs'] is not None:
+                discrete_tokens = batch['discrete_obs']
                 discrete_embeddings = self.embed_token(discrete_tokens)
                 discrete_targets = torch.zeros_like(discrete_tokens)
 
@@ -240,8 +261,8 @@ class GatoPolicy(nn.Module):
             
 
             separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim) * self.separator_token
-            separator_tokens = torch.ones(n_timesteps, 1) * -1
-            separator_targets = torch.zeros(n_timesteps, 1)
+            separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long)
+            separator_targets = torch.zeros(n_timesteps, 1, dtype=torch.long)
             
             # interleave observation, action tokens,add separator
 
@@ -252,8 +273,8 @@ class GatoPolicy(nn.Module):
                     [text_tokens, image_tokens, continuous_tokens, discrete_tokens, separator_tokens, continuous_action_tokens, discrete_action_tokens] 
                     if tokens is not None
                 ], 
-                dim=1
-            )
+                dim=1,
+            ) 
 
             # interleave targets
             batch_target_masks = torch.cat(
@@ -306,7 +327,7 @@ class GatoPolicy(nn.Module):
             token_masks.append(torch.cat([torch.zeros(1, max_tokens -  token_embeddings[i].shape[1]), torch.ones(1,  token_embeddings[i].shape[1])], dim=1))
             
             token_embeddings[i] = torch.cat([torch.zeros(1, max_tokens - token_embeddings[i].shape[1], self.embed_dim), token_embeddings[i]], dim=1)
-            tokens[i] = torch.cat([torch.ones(1, max_tokens - tokens[i].shape[1]) * -1, tokens[i]], dim=1)
+            tokens[i] = torch.cat([torch.zeros(1, max_tokens - tokens[i].shape[1], dtype=torch.long), tokens[i]], dim=1)
             token_target_masks[i] = torch.cat([torch.zeros(1, max_tokens - token_target_masks[i].shape[1]), token_target_masks[i]], dim=1)
 
         # concat
@@ -343,17 +364,17 @@ if __name__ == '__main__':
         'discrete_actions': torch.randint(0, 4, (n_timesteps, 1)),
     }]
 
-    output = model(inputs)
+    #output = model(inputs)
     
     # Mix of image+discrete and continuous+continuous
     output = model([
+        # {
+        #     'images': torch.randn(20, 3, 80, 64),
+        #     'discrete_actions': torch.randint(0, 55, (20, 1)),
+        # },
         {
-            'images': torch.randn(20, 3, 80, 64),
-            'discrete_actions': torch.randint(0, 55, (20, 1)),
-        },
-        {
-            'continuous': torch.randn(15, 8),
+            'continuous_obs': torch.randn(15, 8),
             'continuous_actions': torch.randn(15, 4),
         }
-    ])
+    ], compute_loss=True)
     import pdb; pdb.set_trace()
