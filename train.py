@@ -34,6 +34,7 @@ def main(args):
         tasks.append(task)
 
     model = GatoPolicy(
+        device=args.device,
         embed_dim=args.embed_dim,
         layers=args.layers,
         heads=args.heads,
@@ -48,7 +49,9 @@ def main(args):
         use_patch_pos_encoding=not args.disable_patch_pos_encoding,
         use_pos_encoding=not args.disable_inner_pos_encoding,
     )
+    
     model = model.to(args.device)
+    model.device = args.device
 
     optimizer = torch.optim.AdamW(
         model.parameters(),

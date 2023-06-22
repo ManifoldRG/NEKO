@@ -1,16 +1,20 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from einops import rearrange
+
+import gymnasium as gym
 
 # import gato
 from gato.transformers import HFGPT
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
-
+from gato.tasks.control_task import ControlTask
 
 class GatoPolicy(nn.Module):
     def __init__(
         self,
+        device: str,
         embed_dim: int, 
         layers: int,
         heads: int,
@@ -36,6 +40,8 @@ class GatoPolicy(nn.Module):
     ):
         super().__init__()
 
+        self.device = device
+
         self.context_len = context_len
         # this is a dummy value as this implementation does not yet handle language IO
         self.text_tokens = 32000 # SentencePiece vocab size
@@ -49,6 +55,13 @@ class GatoPolicy(nn.Module):
             'continous': self.text_tokens,
             'discrete': self.text_tokens + self.continous_tokens
         }
+
+        self.token_ends = {
+            'text': self.text_tokens - 1,
+            'continous': self.text_tokens + self.continous_tokens - 1,
+            'discrete': self.text_tokens + self.continous_tokens + self.discrete_tokens - 1
+        }
+
 
         self.embed_dim = embed_dim
         self.transformer = HFGPT(
@@ -101,9 +114,16 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs, compute_loss=False):
-        batch_size = len(inputs)
-        token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
+    def forward(self, inputs=None, compute_loss=False, **kwargs):
+        # tokenize inputs
+        if inputs is not None:
+            token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
+        else:
+            assert 'token_embeddings' in kwargs and 'tokens' in kwargs and 'token_target_masks' in kwargs and 'token_masks' in kwargs, 'if inputs is None, must provide embeddings, tokens, and masks'
+            token_embeddings = kwargs['token_embeddings']
+            tokens = kwargs['tokens']
+            token_target_masks = kwargs['token_target_masks']
+            token_masks = kwargs['token_masks']
 
         # pass to transformer
         final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
@@ -337,13 +357,44 @@ class GatoPolicy(nn.Module):
         token_masks = torch.cat(token_masks, dim=0)
         return token_embeddings, tokens, token_target_masks, token_masks
     
-    # generate the next n tokens
-    def predict_n(self, x):
-        pass
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
-    def predict_control(self, x, env):
-        pass
+    def predict_control(self, inputs: dict, task: ControlTask, deterministic: bool = True):
+        # expects that inputs['continuous_actions'] or inputs['discrete_actions'] are padded by 1 timestep
+        
+        action_type = task.action_type # continuous or discrete
+        action_tokens = task.action_tokens
+
+        if action_type == gym.spaces.Discrete:
+            action_str = 'discrete'
+            assert action_tokens == 1, "only support 1 discrete action token"
+        elif action_type == gym.spaces.Box:
+            action_str = 'continuous'
+        
+        valid_predicted_tokens = torch.arange(start=self.token_starts[action_str], end=self.token_ends[action_str] + 1, device=self.device) 
+        
+        token_embeddings, _, _, token_masks = self.embed_inputs(inputs)
+
+        # remove last action_tokens tokens, which are padding
+        token_embeddings = token_embeddings[:, :-action_tokens, :]
+        token_masks = token_masks[:, :-action_tokens]
+
+        predicted_tokens = []
+        # predict tokens, sampling or deterministically picking best token
+        for i in range(action_tokens):
+            logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+            if deterministic:
+                # get most likely token, which is also a valid_predicted_tokens
+                import pdb; pdb.set_trace()
+                pass
+        
+        # convert tokens back to actions
+        if action_type == gym.spaces.Discrete:
+            action = predicted_tokens[0]
+        else:
+            action = self.continuous_action_tokenizer.decode(predicted_tokens)
+        
+        return action
 
 if __name__ == '__main__':
     model = GatoPolicy(
@@ -377,4 +428,3 @@ if __name__ == '__main__':
             'continuous_actions': torch.randn(15, 4),
         }
     ], compute_loss=True)
-    #import pdb; pdb.set_trace()

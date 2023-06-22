@@ -55,10 +55,11 @@ class Trainer:
         self.model.eval()
         
         # loop over eval for each env
-        for task in self.tasks:
-            eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes)
-            for k, v in eval_logs.items():
-                logs[f'evaluation/{task.name}/{k}'] = v
+        with torch.no_grad():
+            for task in self.tasks:
+                eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes)
+                for k, v in eval_logs.items():
+                    logs[f'evaluation/{task.name}/{k}'] = v
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start

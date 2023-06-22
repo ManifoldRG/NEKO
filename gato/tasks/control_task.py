@@ -14,7 +14,7 @@ def tokens_per_space(space):
     if type(space) == gym.spaces.Box:
         return space.shape[0]
     elif type(space) == gym.spaces.Discrete:
-        return space.n
+        return 1
     else:
         raise NotImplementedError(f'Unsupported space: {space}')
 
@@ -31,9 +31,11 @@ class ControlTask(Task):
         self.env_name = env_name
         self.env = env
         self.dataset = dataset
-    
-        assert type(self.env.action_space) in supported_spaces, f'Unsupported action space: {self.env.action_space}'
-        assert type(self.env.observation_space) in supported_spaces, f'Unsupported observation space: {self.env.observation_space}'
+
+        self.action_type = type(self.env.action_space)
+        self.observation_type = type(self.env.observation_space)
+        assert self.action_type in supported_spaces, f'Unsupported action space: {self.env.action_space}'
+        assert self.observation_type in supported_spaces, f'Unsupported observation space: {self.env.observation_space}'
 
         self.action_tokens = tokens_per_space(self.env.action_space)
         self.observation_tokens = tokens_per_space(self.env.observation_space)
@@ -60,11 +62,19 @@ class ControlTask(Task):
             observation, info = self.env.reset()
 
             # sample prompt
-            prompt_dict = self.sample_batch_configurable(self, batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = 1024, share_prompt_episodes=True)[0]
+            input_dict = self.sample_batch_configurable(self, batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = 1024, share_prompt_episodes=True)[0]
 
             done = False
             ep_return = 0
             while not done:
+                # append new observation, and pad actions
+                input_dict['observations'] = np.concatenate([input_dict['observations'], observation], axis=0)
+                # TODO, make sure right shape for discrete
+                input_dict['actions'] = np.concatenate([input_dict['actions'], np.zeros(1, self.action_tokens)], axis=0)
+
+                action = model.predict_control(input_dict, task=self).cpu().numpy()
+                input_dict['actions'][-1,] = action
+
                 observation, reward, terminated, truncated, info = self.env.step(action)
                 done = terminated or truncated
                 ep_return += reward 
