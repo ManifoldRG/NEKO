@@ -18,8 +18,9 @@ class GatoPolicy(nn.Module):
         embed_dim: int, 
         layers: int,
         heads: int,
-
         dropout: float,
+
+        activation_fn='geglu',
 
         mu: int = 100,
         M: int = 256,
@@ -35,8 +36,6 @@ class GatoPolicy(nn.Module):
 
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
-        
-
     ):
         super().__init__()
 
@@ -66,12 +65,12 @@ class GatoPolicy(nn.Module):
         self.embed_dim = embed_dim
         self.transformer = HFGPT(
             n_embd=embed_dim,
-            use_geglu=True, # TODO, make this configurble
             n_layer=layers,
             n_head=heads,
             dropout=dropout,
             vocab_size=self.vocab_size,
             n_positions=context_len,
+            activation_fn=activation_fn,
         )
         # TODO, add option to init from pretrained LM
 

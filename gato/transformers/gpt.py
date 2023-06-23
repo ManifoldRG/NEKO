@@ -22,12 +22,14 @@ class HFGPT(nn.Module):
         n_layer=12,
         n_head=12,
         dropout: float = 0.1,
-        use_geglu: bool = False,
+        activation_fn: str = "geglu",
     ):
         super().__init__()
         kwargs = {}
-        if use_geglu:
+        if activation_fn == "geglu":
             kwargs["afn"] = "geglu"
+        else:
+            kwargs["afn"] = activation_fn
         cfg = OpenAIGPTConfig(
             vocab_size=vocab_size,
             n_positions=n_positions,

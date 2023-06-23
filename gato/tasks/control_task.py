@@ -78,7 +78,7 @@ class ControlTask(Task):
             action_str = 'discrete_actions'
         self.action_str = action_str
 
-    def evaluate(self, model, n_iterations, deterministic=True):
+    def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []
         ep_lens = []
@@ -90,19 +90,29 @@ class ControlTask(Task):
             observation, info = self.env.reset()
 
             # sample prompt
-            input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True)[0]
+            if not promptless_eval:
+                input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True)[0]
+            else:
+                input_dict = None
+
             done = False
             ep_return = 0
             ep_len = 0
             while not done:
-                # append new observation, and pad actions
                 new_obs = torch.tensor(observation, device=model.device).unsqueeze(0)
                 if self.image_transform is not None:
                     new_obs = self.image_transform.transform(new_obs)
-                input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
-                
-                input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=input_dict[self.action_str].dtype)], dim=0)
-                
+
+                # append new observation, and pad actions
+                if input_dict is not None:
+                    input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
+                    input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=input_dict[self.action_str].dtype)], dim=0)
+                else:
+                    input_dict = {
+                        self.obs_str: new_obs,
+                        self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=torch.float32),
+                    }
+
                 # trim to context length
                 input_dict[self.obs_str] = input_dict[self.obs_str][-context_timesteps:,]
                 input_dict[self.action_str] = input_dict[self.action_str][-context_timesteps:,]
@@ -155,7 +165,7 @@ class ControlTask(Task):
         return episode_dicts
 
     #def sample_batch_configurable(self, batch_size, device, max_tokens=1024, prompt_proportion=0.5, prompt_type='end', share_prompt_episodes=True):
-    def sample_batch_configurable(self, batch_size: int, device: str, prompt_proportions: list[float], prompt_types: list[str], max_tokens: int = 1024, share_prompt_episodes=True):
+    def sample_batch_configurable(self, batch_size: int, device: str, prompt_proportions: list, prompt_types: list, max_tokens: int = 1024, share_prompt_episodes=True):
         # Samples a batch of episodes, where each episode has maximum of max_tokens tokens
         # This will return a list of dictionaries, where each dicionary contains variable length tensors,
         # This is in constrast to returning single tensors which contain all episodes with padding

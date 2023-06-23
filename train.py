@@ -50,6 +50,7 @@ def main(args):
         context_len=args.sequence_length,
         use_patch_pos_encoding=not args.disable_patch_pos_encoding,
         use_pos_encoding=not args.disable_inner_pos_encoding,
+        activation_fn=args.activation_fn,
     )
     
     model = model.to(args.device)
@@ -98,6 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dim', type=int, default=768)
     parser.add_argument('--layers', type=int, default=8)
     parser.add_argument('--heads', type=int, default=24)
+    parser.add_argument('--activation_fn', type=str, default='geglu')
 
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=512)
@@ -124,6 +126,7 @@ if __name__ == '__main__':
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=10)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
+    parser.add_argument('--promptless_eval', action='store_true', default=False)
 
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
