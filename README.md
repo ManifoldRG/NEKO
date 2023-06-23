@@ -42,6 +42,27 @@ python train.py --embed_dim=128 --layers=2 --heads=4 --training_steps=1000 --log
 python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --log_eval_freq=1 --warmup_steps=100 --batch_size=4 -k=512 --eval_episodes=1 --device=cuda --datasets Breakout-expert_s0-v0
 ```
 
+## Examples
+
+```python
+# This computes logits and (cross-entropy) loss over a batch of size three, where each diciontary is an episode in the batch
+logits, loss = model([
+    {
+        'images': torch.randn(20, 3, 80, 64),
+        'discrete_actions': torch.randint(0, 55, (20, 1)),
+    },
+    {
+        'continuous_obs': torch.randn(15, 8),
+        'continuous_actions': torch.randn(15, 4),
+    },
+    {
+        'images': torch.randn(100, 3, 224, 224),
+        'continuous_actions': torch.randn(100, 11),
+    }
+], compute_loss=True)
+
+```
+
 # Credits
 
 This implementation is influenced or uses components from:
