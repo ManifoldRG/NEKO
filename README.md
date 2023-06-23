@@ -45,6 +45,9 @@ python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --lo
 ## Examples
 
 ```python
+import torch
+from gato.policy.gato_policy import GatoPolicy
+
 model = GatoPolicy(
         device='cpu',
         embed_dim=128,
