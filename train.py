@@ -76,7 +76,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--device', type=str, default='cpu') # e.g. cuda:0
+    parser.add_argument('--device', type=str, default='cuda') # e.g. cuda:0
 
     # Input & tokenization
     parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq

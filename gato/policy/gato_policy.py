@@ -114,7 +114,7 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs: list[dict] = None, compute_loss=False, **kwargs):
+    def forward(self, inputs: list = None, compute_loss=False, **kwargs):
         # tokenize inputs
         if inputs is not None:
             token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
@@ -151,7 +151,7 @@ class GatoPolicy(nn.Module):
         return logits, loss
 
 
-    def tokenize_input_dicts(self, inputs: list[dict]):
+    def tokenize_input_dicts(self, inputs: list):
         """"
         inputs: list of dicts for each batch
         [
