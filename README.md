@@ -45,7 +45,16 @@ python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --lo
 ## Examples
 
 ```python
+model = GatoPolicy(
+        device='cpu',
+        embed_dim=128,
+        layers=2,
+        heads=4,
+        dropout=0.1,
+)
+
 # This computes logits and (cross-entropy) loss over a batch of size three, where each diciontary is an episode in the batch
+
 logits, loss = model([
     {
         'images': torch.randn(20, 3, 80, 64),
