@@ -89,7 +89,7 @@ class GatoPolicy(nn.Module):
         
         self.continuous_obs_tokenizer = ContinuousTokenizer(
             use_mu_law=True, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
-        ) # continuous actions expected to be in [-1, 1]
+        )
 
 
         # Token Embeddings
@@ -248,6 +248,7 @@ class GatoPolicy(nn.Module):
             
             if 'discrete_obs' in batch and batch['discrete_obs'] is not None:
                 discrete_tokens = batch['discrete_obs']
+                discrete_action_tokens += self.token_starts['discrete'] # add offset
                 discrete_embeddings = self.embed_token(discrete_tokens)
                 discrete_targets = torch.zeros_like(discrete_tokens, device=self.device)
 
@@ -268,6 +269,9 @@ class GatoPolicy(nn.Module):
 
             if 'discrete_actions' in batch and batch['discrete_actions'] is not None:
                 discrete_action_tokens = batch['discrete_actions']
+                discrete_action_tokens += self.token_starts['discrete'] # add offset
+
+                # embed
                 discrete_action_embeddings = self.embed_token(discrete_action_tokens)
                 discrete_action_targets = torch.ones_like(discrete_action_tokens)
 
