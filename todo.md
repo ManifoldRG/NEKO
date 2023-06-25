@@ -10,6 +10,7 @@ potential areas to look at for debugging results:
 - verify transformers/gpt.py
 - try disabling position encodings
 - MuJoCo dataset are custom, could be a problem with dataset but unlikely. Could substitute in an official Minari dataset, e.g.: https://minari.farama.org/datasets/door/
+- Check sampling and building episode from dataset
 
 things to add: 
 - stochastic depth
