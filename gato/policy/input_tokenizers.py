@@ -42,5 +42,14 @@ class ContinuousTokenizer:
         return tensor
 
 
+if __name__ == '__main__':
+    tokenizer = ContinuousTokenizer(use_mu_law=False, offset=0)
+    input = (-1 - 1) * torch.rand(1, 10) + 1
+    encoded = tokenizer.encode(input)
+    decoded = tokenizer.decode(encoded)
+
+    tokenizer = ContinuousTokenizer(use_mu_law=True, offset=0)
+    #input = (-1 - 1) * torch.rand(1, 10) + 1
+    encoded = tokenizer.encode(input)
 
 
