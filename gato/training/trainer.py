@@ -136,10 +136,10 @@ class Trainer:
                         task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
                     else:
                         task_vanilla_batch_size += 1
-                # sample episodes from dataset
-                if total_task_batch_size > 0:
-                    task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
-                    batch_dicts.extend(task_episode_dicts)
+            # sample episodes from dataset
+            if total_task_batch_size > 0:
+                task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
+                batch_dicts.extend(task_episode_dicts)
         return batch_dicts   
 
 def linear_warmup_cosine_decay(current_step, warmup_steps, max_steps, base_lr, init_lr, min_lr, disable_cosine_decay=False):

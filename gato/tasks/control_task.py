@@ -184,7 +184,6 @@ class ControlTask(Task):
             main_episodes = all_episodes
             prompt_episodes = all_episodes
         else:
-            all_episodes = self.dataset.sample_episodes(n_episodes=batch_size)
             main_episodes = all_episodes
             # prompts come from different episodes
             prompt_episodes = all_episodes[1:] + all_episodes[:1]
@@ -198,8 +197,8 @@ class ControlTask(Task):
             timesteps_for_main = round(num_timesteps * (1 - prompt_proportions[i]))
             timesteps_for_mains.append(timesteps_for_main) # max main size
             timesteps_for_prompts.append(num_timesteps - timesteps_for_main) # max prompt size
-
             ep_len = episode.total_timesteps
+            
             if timesteps_for_main >= ep_len:
                 # sample entire episode
                 start = 0
