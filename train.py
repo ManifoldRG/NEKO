@@ -68,6 +68,7 @@ def main(args):
         model = model,
         optimizer = optimizer,
         tasks = tasks,
+        exp_name = exp_name,
         args=args
     )
 
@@ -99,7 +100,8 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dim', type=int, default=768)
     parser.add_argument('--layers', type=int, default=8)
     parser.add_argument('--heads', type=int, default=24)
-    parser.add_argument('--activation_fn', type=str, default='geglu')
+    parser.add_argument('--activation_fn', type=str, default='gelu')
+    #parser.add_argument('--activation_fn', type=str, default='geglu')
 
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=512)
@@ -140,6 +142,11 @@ if __name__ == '__main__':
     # logging
     parser.add_argument('--use_wandb', '-w', action='store_true', default=False)
     parser.add_argument('--wandb_project', type=str, default='gato-control')
+
+    # saving
+    parser.add_argument('--save_model', action='store_true', default=False)
+    parser.add_argument('--save_mode', type=str, default='last', choices=['checkpoint', 'last']) # Checkpoit saves model every after each log_eval_freq steps
+    parser.add_argument('--save_dir', type=str, default='models')
     
     args = parser.parse_args()
     args = DotDict(vars(args))

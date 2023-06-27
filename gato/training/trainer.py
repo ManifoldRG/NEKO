@@ -1,8 +1,11 @@
 import time
+import os
 
 import wandb
 import numpy as np
 import torch
+
+from gato.utils.utils import save_model
 
 class Trainer:
     def __init__(
@@ -10,6 +13,7 @@ class Trainer:
         model,
         optimizer,
         tasks,
+        exp_name,
         args
     ):
         self.model = model
@@ -22,6 +26,9 @@ class Trainer:
         self.min_lr = self.args.learning_rate / self.args.min_factor
         self.deterministic = self.args.eval_mode == 'deterministic'
 
+        self.exp_name = exp_name
+        self.exp_dir = os.path.join(self.args.save_dir, self.exp_name)
+
         self.steps = 0
         self.start_time = None
     
@@ -32,6 +39,11 @@ class Trainer:
             logs = self.train_iteration(self.args.log_eval_freq, i)
             if self.args.use_wandb:
                 wandb.log(logs)
+        
+        ## Save model at end of training only if not saving checkpoints
+        if self.args.save_model and self.args.save_mode == 'last':
+            save_model(self.model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
+
     
     def train_iteration(self, num_steps, iter):
         logs = {}
@@ -72,6 +84,10 @@ class Trainer:
             print(f'Iteration {iter}')
             for k, v in logs.items():
                 print(f'{k}: {v}')
+        
+        ## Save model
+        if self.args.save_model and self.args.save_mode == 'checkpoint':
+            save_model(self.model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
 
         return logs
 
@@ -93,7 +109,11 @@ class Trainer:
         batch_dicts = self.sample_control_batch(self.args.batch_size)
 
         # Compute loss and update model
+        # if self.steps >= 100:
+        #     logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True, pdb=True)
+        # else:
         logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
+
 
         self.optimizer.zero_grad()
         loss.backward()

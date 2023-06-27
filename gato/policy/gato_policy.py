@@ -4,9 +4,10 @@ import numpy as np
 from einops import rearrange
 
 import gymnasium as gym
+import transformers
 
 # import gato
-from gato.transformers import HFGPT
+from gato.transformers import HFGPT, GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 from gato.tasks.control_task import ControlTask
@@ -20,7 +21,7 @@ class GatoPolicy(nn.Module):
         heads: int,
         dropout: float,
 
-        activation_fn='geglu',
+        activation_fn='gelu',
 
         mu: int = 100,
         M: int = 256,
@@ -43,7 +44,8 @@ class GatoPolicy(nn.Module):
 
         self.context_len = context_len
         # this is a dummy value as this implementation does not yet handle language IO
-        self.text_tokens = 32000 # SentencePiece vocab size
+        #self.text_tokens = 32000 # SentencePiece vocab size
+        self.text_tokens = 1
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
@@ -63,15 +65,29 @@ class GatoPolicy(nn.Module):
 
 
         self.embed_dim = embed_dim
-        self.transformer = HFGPT(
+        # self.transformer = HFGPT(
+        #     n_embd=embed_dim,
+        #     n_layer=layers,
+        #     n_head=heads,
+        #     dropout=dropout,
+        #     vocab_size=self.vocab_size,
+        #     n_positions=context_len,
+        #     activation_fn=activation_fn,
+        # )
+        config = transformers.GPT2Config(
+            vocab_size=1,  # doesn't matter -- we don't use the vocab
             n_embd=embed_dim,
-            n_layer=layers,
             n_head=heads,
-            dropout=dropout,
-            vocab_size=self.vocab_size,
+            n_layer=layers,
+            resid_pdrop=dropout,
+            attn_pdrop=dropout,
             n_positions=context_len,
-            activation_fn=activation_fn,
+            n_inner=embed_dim * 4,
+            activation_function=activation_fn,
         )
+        config.n_ctx = context_len
+        self.transformer = self.transformer = GPT2Model(config)
+
         # TODO, add option to init from pretrained LM
 
         # head
@@ -125,7 +141,8 @@ class GatoPolicy(nn.Module):
             token_masks = kwargs['token_masks']
 
         # pass to transformer
-        final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
+        #final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
+        final_representations = self.transformer(inputs_embeds=token_embeddings, attention_mask=token_masks)['last_hidden_state']
 
         # predict logits
         logits = self.predict_token(final_representations)
@@ -143,7 +160,8 @@ class GatoPolicy(nn.Module):
             loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0]
             target_tokens = target_tokens.reshape(-1)[loss_masks > 0]
             loss = torch.nn.functional.cross_entropy(loss_logits, target_tokens)
-
+            if 'pdb' in kwargs and kwargs['pdb']:
+                import pdb; pdb.set_trace()
         else:
             loss = None
         
