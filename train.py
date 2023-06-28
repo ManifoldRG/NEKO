@@ -45,6 +45,7 @@ def main(args):
         use_patch_pos_encoding=not args.disable_patch_pos_encoding,
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
+        pretrained_lm=args.pretrained_lm,
     )
     # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -102,6 +103,7 @@ if __name__ == '__main__':
     parser.add_argument('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
 
     # transformer architecture hyperparameters
+    parser.add_argument('--pretrained_lm', type=str, default=None)
     parser.add_argument('--embed_dim', type=int, default=768)
     parser.add_argument('--layers', type=int, default=8)
     parser.add_argument('--heads', type=int, default=24)
