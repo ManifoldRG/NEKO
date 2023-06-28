@@ -37,6 +37,8 @@ class GatoPolicy(nn.Module):
 
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
+
+        pretrained_lm: str = None # Optional, name of pretrained language model to use
     ):
         super().__init__()
 
@@ -64,7 +66,6 @@ class GatoPolicy(nn.Module):
         }
 
 
-        self.embed_dim = embed_dim
         # self.transformer = HFGPT(
         #     n_embd=embed_dim,
         #     n_layer=layers,
@@ -74,21 +75,31 @@ class GatoPolicy(nn.Module):
         #     n_positions=context_len,
         #     activation_fn=activation_fn,
         # )
-        config = transformers.GPT2Config(
-            vocab_size=1,  # doesn't matter -- we don't use the vocab
-            n_embd=embed_dim,
-            n_head=heads,
-            n_layer=layers,
-            resid_pdrop=dropout,
-            attn_pdrop=dropout,
-            n_positions=context_len,
-            n_inner=embed_dim * 4,
-            activation_function=activation_fn,
-        )
-        config.n_ctx = context_len
-        self.transformer = self.transformer = GPT2Model(config)
+        if pretrained_lm is not None:
+            config = transformers.GPT2Config.from_pretrained(pretrained_lm)
+            config.attn_pdrop = dropout # 0.1
+            config.resid_pdrop = dropout
+            self.transformer = GPT2Model.from_pretrained(
+                pretrained_lm,
+                config=config,
+            )
+            self.embed_dim = config.n_embd
+        else:
+            config = transformers.GPT2Config(
+                vocab_size=1,  # doesn't matter -- we don't use the vocab
+                n_embd=embed_dim,
+                n_head=heads,
+                n_layer=layers,
+                resid_pdrop=dropout,
+                attn_pdrop=dropout,
+                n_positions=context_len,
+                n_inner=embed_dim * 4,
+                activation_function=activation_fn,
+            )
+            config.n_ctx = context_len
+            self.transformer = self.transformer = GPT2Model(config)
 
-        # TODO, add option to init from pretrained LM
+        self.embed_dim = embed_dim
 
         # head
         self.predict_token = nn.Linear(embed_dim, self.vocab_size, bias=False)

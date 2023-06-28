@@ -29,15 +29,14 @@ Where datasets can be any string in download_custom_datasets.py or dataset in ht
 Below are some example training commands. These have been at least tested for a few updates and evaluation to verify logical correctness, but full training runs may not have been performed. 
 
 
+Training on 3 MuJoCo locomotion tasks:
 ```bash
-python train.py --datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2
+python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=100000 --log_eval_freq=10000 --warmup_steps=10000 --batch_size=32 -k=240 --eval_episodes=10 --activation_fn=gelu --save_model --save_mode=checkpoint --datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2 -w
 ```
+https://wandb.ai/daniellawson9999/gato-control/runs/5yfksnce?workspace=user-daniellawson9999
 
-test, with toy size
-```bash
-python train.py --embed_dim=128 --layers=2 --heads=4 --training_steps=1000 --log_eval_freq=10 --warmup_steps=100 --batch_size=4 -k=256
-```
 
+Atari (not tested):
 ```bash
 python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --log_eval_freq=1 --warmup_steps=100 --batch_size=4 -k=512 --eval_episodes=1 --device=cuda --datasets Breakout-expert_s0-v0
 ```

@@ -47,6 +47,12 @@ def main(args):
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
     )
+
+    if args.init_checkpoint is not None:
+        print('Loading model from checkpoint:', args.init_checkpoint)
+        model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
+
+
     # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('Trainable Parameters:', '{}M'.format(params / 1e6))
@@ -103,7 +109,9 @@ if __name__ == '__main__':
     parser.add_argument('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
 
     # transformer architecture hyperparameters
-    parser.add_argument('--pretrained_lm', type=str, default=None)
+    parser.add_argument('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
+    parser.add_argument('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
+
     parser.add_argument('--embed_dim', type=int, default=768)
     parser.add_argument('--layers', type=int, default=8)
     parser.add_argument('--heads', type=int, default=24)

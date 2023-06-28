@@ -24,6 +24,8 @@ def main(args):
         args_path = args.args_path
     
     training_args = json.load(open(args_path, 'r'))
+    if 'pretrained_lm' in training_args:
+        del training_args['pretrained_lm']
 
     # update args with eval_args
     for k, v in args.items():
