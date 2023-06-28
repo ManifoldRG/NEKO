@@ -1,5 +1,7 @@
 We are aiming to provide  working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation for control tasks to be used for [Manifold's Neko](https://github.com/ManifoldRG) or other projects. This implementation is currently in progress.
 
+If you use this project, we'd love for you to refer back to Manifold in your code!
+
 # Setup
 ```bash
 conda env create -f env.yml 
