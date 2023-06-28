@@ -16,6 +16,7 @@ things to add:
 - stochastic depth
 - currently supporting Box and Discrete spaces, implement others: https://gymnasium.farama.org/api/spaces/, like spaces.Text
 - could improve tokenize_input_dicts() so that matching modality combinations are grouped before loop over dicts
+- add/test geglu over gelu in transformer blocks
 
 Purposeful changes from Gato:
 - added gradient clipping (can be disabled)
