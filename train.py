@@ -13,12 +13,6 @@ from gato.tasks.control_task import ControlTask
 def main(args):
     exp_id = random.randint(int(1e5), int(1e6) - 1)
     exp_name = f'gato-control-{exp_id}'
-    if args.use_wandb:
-        wandb.init(
-            name = exp_name,
-            project=args.wandb_project,
-            config=args,
-        )
 
     envs, datasets = load_envs(args.datasets) # Load Minari datasets and corresponding Gym environments
 
@@ -52,7 +46,11 @@ def main(args):
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
     )
-    
+    # print trainable parameters
+    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('Trainable Parameters:', '{}M'.format(params / 1e6))
+    args.trainable_params = params
+
     model = model.to(args.device)
     model.device = args.device
 
@@ -63,6 +61,13 @@ def main(args):
         eps=args.adam_eps,
         weight_decay=args.weight_decay,
     )
+
+    if args.use_wandb:
+        wandb.init(
+            name = exp_name,
+            project=args.wandb_project,
+            config=args,
+        )
 
     trainer = Trainer(
         model = model,
