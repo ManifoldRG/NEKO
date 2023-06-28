@@ -82,10 +82,9 @@ logits, loss = model([
 
 # Credits
 
-This implementation is influenced or uses components from:
+This implementation is influenced and uses components from:
 - https://github.com/OrigamiDream/gato/tree/main
 - https://github.com/LAS1520/Gato-A-Generalist-Agent
-- [VIMA: General Robot Manipulation with Multimodal Prompts](https://arxiv.org/abs/2210.03094): https://github.com/vimalabs/VIMA
-- [Decision Transformer: Reinforcement Learning via Sequence Modeling
-]([https://arxiv.org/abs/2106.01345](https://github.com/kzl/decision-transformer)) 
-- [Can Wikipedia Help Offline Reinforcement Learning?](https://github.com/machelreid/can-wikipedia-help-offline-rl),  
+- [VIMA: General Robot Manipulation with Multimodal Prompts](https://github.com/vimalabs/VIMA)
+- [Decision Transformer: Reinforcement Learning via Sequence Modeling](https://github.com/kzl/decision-transformer) 
+- [Can Wikipedia Help Offline Reinforcement Learning?](https://github.com/machelreid/can-wikipedia-help-offline-rl)  
