@@ -1,7 +1,6 @@
-(In Progress)
+We are aiming to provide  working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation for control tasks to be used for [Manifold's Neko](https://github.com/ManifoldRG) or other projects. This implementation is currently in progress.
 
-Goal: working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation for control tasks to be used for [Manifold's Neko](https://github.com/ManifoldRG), or other projects.
-
+If you use this project, we'd love for you to refer back to Manifold in your code!
 
 # Setup
 ```bash
@@ -22,24 +21,24 @@ pip install -e .
 cd ..
 python ./gato/data/download_custom_datasets.py
 ```
-
-Where datasets can be any string in download_custom_datasets.py or dataset in https://minari.farama.org/ with Box or Discrete observation or action spaces, although these environments have not been tested yet. 
-
 # Training
-Below are some example training commands. These have been at least tested for a few updates and evaluation to verify logical correctness, but full training runs may not have been performed. 
-
+Below are some example training commands. 
 
 Training on 3 MuJoCo locomotion tasks:
 ```bash
 python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=100000 --log_eval_freq=10000 --warmup_steps=10000 --batch_size=32 -k=240 --eval_episodes=10 --activation_fn=gelu --save_model --save_mode=checkpoint --datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2 -w
 ```
-https://wandb.ai/daniellawson9999/gato-control/runs/5yfksnce?workspace=user-daniellawson9999
+results of run: https://wandb.ai/daniellawson9999/gato-control/runs/5yfksnce?workspace=user-daniellawson9999
 
 
 Atari (not tested):
 ```bash
 python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --log_eval_freq=1 --warmup_steps=100 --batch_size=4 -k=512 --eval_episodes=1 --device=cuda --datasets Breakout-expert_s0-v0
 ```
+
+In general, datasets can contain lists of any strings in download_custom_datasets.py or a dataset in https://minari.farama.org/ with Box or Discrete observation or action spaces, although these environments have not been tested yet. 
+for example:
+--datasets Breakout-expert_s0-v0 hammer-expert-v0
 
 ## Evaluation
 ```bash
@@ -78,6 +77,9 @@ logits, loss = model([
 ], compute_loss=True)
 
 ```
+
+# Future
+Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/todo.md).  
 
 # Credits
 
