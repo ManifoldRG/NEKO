@@ -1,5 +1,6 @@
 import argparse
 import random
+import os
 
 import wandb
 import torch
@@ -75,6 +76,10 @@ def main(args):
             project=args.wandb_project,
             config=args,
         )
+
+    # Create save dir if does not exist
+    if args.save_model and not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
 
     trainer = Trainer(
         model = model,
