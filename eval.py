@@ -80,7 +80,7 @@ def main(args):
     # loop over eval for each env
     with torch.no_grad():
         for task in tasks:
-            eval_logs = task.evaluate(model, n_iterations=eval_args.eval_episodes, deterministic=eval_args.deterministic == 'deterministic', promptless_eval=eval_args.promptless_eval)
+            eval_logs = task.evaluate(model, n_iterations=eval_args.eval_episodes, deterministic=eval_args.eval_mode == 'deterministic', promptless_eval=eval_args.promptless_eval)
             for k, v in eval_logs.items():
                 logs[f'evaluation/{task.name}/{k}'] = v
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=None)
-    parser.add_argument('--eval_mode', type=str, default=None, choices=['deterministic', 'stochastic'])
+    parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=None)
 
     # datasets / envs
