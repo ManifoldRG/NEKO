@@ -2,6 +2,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import minari
+from minari.dataset.minari_dataset import EpisodeData
 
 from gato.tasks.task import Task
 
@@ -29,6 +30,7 @@ class ControlTask(Task):
             args,
             training_prompt_len_proportion=0.5, 
             share_prompt_episodes=True,
+            top_k_prompting=None
         ):
         super().__init__()
         self.name = env_name
@@ -51,11 +53,21 @@ class ControlTask(Task):
         self.training_prompt_len_proportion = training_prompt_len_proportion 
         assert self.training_prompt_len_proportion >= 0 and self.training_prompt_len_proportion <= 1
         
-        # Specifies if prompt should come from the same episode as the main chunk
+        # Specifies if prompt should come from the same episode as the main chunk during training
         self.share_prompt_episodes = share_prompt_episodes
 
         # Ways of sampling prompts
         self.prompt_types = ['start', 'end','uniform']
+
+        # If prompts should be sampled from top k episodes, or uniform during eval
+        self.top_k_prompting = top_k_prompting
+        if self.top_k_prompting is not None:
+            assert self.top_k_prompting > 0 and self.top_k_prompting <= self.dataset.total_episodes, 'top k must be between 0 and total episodes for all datasets'
+            # calculate top k ep ids
+            ep_returns = np.array([ep.rewards.sum() for ep in self.dataset])
+            self.top_ids = np.argsort(ep_returns)[-self.top_k_prompting:]
+        else:
+            self.filter_fn = None
 
         
         if type(self.env.observation_space) == gym.spaces.Box:
@@ -91,7 +103,7 @@ class ControlTask(Task):
 
             # sample prompt
             if not promptless_eval:
-                input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True)[0]
+                input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True,ep_ids=self.top_ids)[0]
             else:
                 input_dict = None
 
@@ -165,8 +177,15 @@ class ControlTask(Task):
         
         return episode_dicts
 
-    #def sample_batch_configurable(self, batch_size, device, max_tokens=1024, prompt_proportion=0.5, prompt_type='end', share_prompt_episodes=True):
-    def sample_batch_configurable(self, batch_size: int, device: str, prompt_proportions: list, prompt_types: list, max_tokens: int = 1024, share_prompt_episodes=True):
+    def sample_batch_configurable(
+            self, batch_size: int, 
+            device: str, 
+            prompt_proportions: list, 
+            prompt_types: list, 
+            max_tokens: int = 1024, 
+            share_prompt_episodes=True,
+            ep_ids = None
+        ):
         # Samples a batch of episodes, where each episode has maximum of max_tokens tokens
         # This will return a list of dictionaries, where each dicionary contains variable length tensors,
         # This is in constrast to returning single tensors which contain all episodes with padding
@@ -180,7 +199,9 @@ class ControlTask(Task):
             'observations': [],
         }
 
-        all_episodes = self.dataset.sample_episodes(n_episodes=batch_size)
+        # Filter dataset if filter function is provided
+        all_episodes = self.sample_episodes(n_episodes=batch_size, episode_indices=ep_ids)
+
         if share_prompt_episodes:
             main_episodes = all_episodes
             prompt_episodes = all_episodes
@@ -274,6 +295,22 @@ class ControlTask(Task):
             }
             episode_dicts.append(episode_dict)
         return episode_dicts
+    
+    # Extension of default Minari sample_episodes where custom episode_indices can be passed
+    def sample_episodes(self, n_episodes: int, episode_indices: list = None):
+        """Sample n number of episodes from the dataset.
+
+        Args:
+            n_episodes (Optional[int], optional): number of episodes to sample.
+        """
+        if episode_indices is None:
+            episode_indices = self.dataset._episode_indices
+        indices = self.dataset._generator.choice(
+            episode_indices, size=n_episodes, replace=False
+        )
+        episodes = self.dataset._data.get_episodes(indices)
+        return list(map(lambda data: EpisodeData(**data), episodes))
+
         
 
 

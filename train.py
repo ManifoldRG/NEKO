@@ -24,9 +24,10 @@ def main(args):
             env, 
             dataset,
             args = args,
-            context_len=args.sequence_length,
+            context_len = args.sequence_length,
             training_prompt_len_proportion=args.prompt_len_proportion,
-            share_prompt_episodes = not args.unique_prompt_episodes
+            share_prompt_episodes = not args.unique_prompt_episodes,
+            top_k_prompting = args.top_k
         )
         tasks.append(task)
 
@@ -157,7 +158,7 @@ if __name__ == '__main__':
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
     parser.add_argument('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
     parser.add_argument('--unique_prompt_episodes', default=False, action='store_true')
-
+    parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
 
     # logging
     parser.add_argument('--use_wandb', '-w', action='store_true', default=False)

@@ -49,7 +49,8 @@ def main(args):
             args = eval_args,
             context_len=eval_args.sequence_length,
             training_prompt_len_proportion=eval_args.prompt_len_proportion,
-            share_prompt_episodes = not eval_args.unique_prompt_episodes
+            share_prompt_episodes = not eval_args.unique_prompt_episodes,
+            top_k_prompting = args.top_k
         )
         env_names.append(env.unwrapped.spec.id)
         tasks.append(task)
@@ -106,6 +107,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_episodes', type=int, default=None)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=None)
+    parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
     parser.add_argument('--render', action='store_true', default=None)
 
     # datasets / envs
