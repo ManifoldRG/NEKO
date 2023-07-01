@@ -1,4 +1,6 @@
 import minari
+import gymnasium as gym
+
 from gato.envs.atari import load_atari_env
 
 custom_env_loaders = {
@@ -20,15 +22,19 @@ def load_env_dataset(dataset_name: str, load_kwargs: dict = {}):
     # load dataset
     dataset = minari.load_dataset(dataset_name)
 
-    # recover environment
-    env = dataset.recover_environment()
-    env_name = env.unwrapped.spec.id
+    env_name = dataset._data.env_spec.id
+    env = None
 
-    # rebuild environment if custom loader specified
+    # custom environment build if custom loader specified
     for prefix, loader in custom_env_loaders.items():
         if prefix in env_name:
             env = loader(env_name, load_kwargs)
             break
+
+    # Default to recovering dataset from Minari
+    if env is None:
+        env = gym.make(dataset._data.env_spec, **load_kwargs)
+
     
     return env, dataset
 

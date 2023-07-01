@@ -119,7 +119,8 @@ class ControlTask(Task):
 
                 action = model.predict_control(input_dict, task=self, deterministic=deterministic)
                 input_dict[self.action_str][-1,] = action
-                observation, reward, terminated, truncated, info = self.env.step(action.cpu().numpy())
+                np_action = action.cpu().numpy()
+                observation, reward, terminated, truncated, info = self.env.step(np_action)
                 done = terminated or truncated
                 ep_return += reward 
                 ep_len += 1

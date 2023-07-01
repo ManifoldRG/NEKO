@@ -34,7 +34,10 @@ def main(args):
 
     eval_args = DotDict(training_args)
 
-    envs, datasets = load_envs(eval_args.datasets) # Load Minari datasets and corresponding Gym environments
+    env_args = {
+        'render_mode': 'human' if args.render else None,
+    }
+    envs, datasets = load_envs(eval_args.datasets, env_args) # Load Minari datasets and corresponding Gym environments
 
     tasks = []
     env_names = []
@@ -103,6 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_episodes', type=int, default=None)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=None)
+    parser.add_argument('--render', action='store_true', default=None)
 
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=None)
