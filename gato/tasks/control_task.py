@@ -121,7 +121,6 @@ class ControlTask(Task):
                 new_obs = torch.tensor(observation, device=model.device).unsqueeze(0)
                 if self.image_transform is not None:
                     new_obs = self.image_transform.transform(new_obs)
-
                 # append new observation, and pad actions
                 if input_dict is not None:
                     input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
@@ -135,7 +134,6 @@ class ControlTask(Task):
                 # trim to context length
                 input_dict[self.obs_str] = input_dict[self.obs_str][-context_timesteps:,]
                 input_dict[self.action_str] = input_dict[self.action_str][-context_timesteps:,]
-
                 action = model.predict_control(input_dict, task=self, deterministic=deterministic)
                 input_dict[self.action_str][-1,] = action
                 np_action = action.cpu().numpy()
@@ -295,7 +293,6 @@ class ControlTask(Task):
             
             # make sure actions are 2D
             actions = actions.reshape(actions.shape[0], self.action_tokens)
-
             episode_dict = {
                 self.action_str: actions,
                 self.obs_str: observations,

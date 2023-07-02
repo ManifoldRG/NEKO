@@ -277,7 +277,7 @@ class GatoPolicy(nn.Module):
             
             if 'discrete_obs' in batch and batch['discrete_obs'] is not None:
                 discrete_tokens = batch['discrete_obs']
-                discrete_action_tokens += self.token_starts['discrete'] # add offset
+                discrete_tokens = discrete_tokens + self.token_starts['discrete'] # add offset
                 discrete_embeddings = self.embed_token(discrete_tokens)
                 discrete_targets = torch.zeros_like(discrete_tokens, device=self.device)
 
@@ -298,7 +298,7 @@ class GatoPolicy(nn.Module):
 
             if 'discrete_actions' in batch and batch['discrete_actions'] is not None:
                 discrete_action_tokens = batch['discrete_actions']
-                discrete_action_tokens += self.token_starts['discrete'] # add offset
+                discrete_action_tokens = discrete_action_tokens + self.token_starts['discrete'] # add offset
 
                 # embed
                 discrete_action_embeddings = self.embed_token(discrete_action_tokens)
@@ -357,7 +357,7 @@ class GatoPolicy(nn.Module):
             batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
             tokens_per_timestep = batch_embeddings.shape[1] # number of tokens per timestep
             total_tokens = n_timesteps * tokens_per_timestep
-            
+
             # reshape to 1 x (n_timesteps * n_tokens) x embed_dim
             batch_embeddings = batch_embeddings.reshape(1, total_tokens, self.embed_dim)
             batch_tokens = batch_tokens.reshape(1, total_tokens)
@@ -407,7 +407,6 @@ class GatoPolicy(nn.Module):
         if action_str == 'discrete':
             assert task.env.action_space.n <= self.discrete_tokens, "discrete action space too large for model"
             end_token = start_token + task.env.action_space.n - 1
-
         token_embeddings, _, _, token_masks = self.tokenize_input_dicts([input])
 
         # remove last action_tokens tokens, which are padding
@@ -428,7 +427,7 @@ class GatoPolicy(nn.Module):
                 # sample from logits
                 probs = torch.nn.functional.softmax(logits, dim=-1)
                 token = torch.multinomial(probs, num_samples=1)[0]
-            token += start_token
+            token = token + start_token
 
             # append to token_embeddings and token_masks
             token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
@@ -438,7 +437,6 @@ class GatoPolicy(nn.Module):
             token_embeddings = token_embeddings[:, -self.context_len:, :]
             token_masks = token_masks[:, -self.context_len:]
             predicted_tokens.append(token)
-
 
         # convert tokens back to actions
         if action_type == gym.spaces.Discrete:

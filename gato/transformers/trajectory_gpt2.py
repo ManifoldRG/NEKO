@@ -169,6 +169,7 @@ class Attention(nn.Module):
             # if only "normal" attention layer implements causal mask
             mask = self.bias[:, :, ns - nd: ns, :ns]
             w = torch.where(mask.bool(), w, self.masked_bias.to(w.dtype))
+        
         if attention_mask is not None:
             # Apply the attention mask
             w = w + attention_mask
