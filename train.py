@@ -17,6 +17,7 @@ from gato.tasks.control_task import ControlTask
 def main(args):
     accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision)
     device = accelerator.device
+    args.device = accelerator.device
 
     exp_id = random.randint(int(1e5), int(1e6) - 1)
     exp_name = f'gato-control-{exp_id}'
@@ -94,6 +95,7 @@ def main(args):
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
+        accelerator = accelerator,
         tasks = tasks,
         exp_name = exp_name,
         args=args

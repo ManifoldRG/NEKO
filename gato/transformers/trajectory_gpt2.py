@@ -137,8 +137,12 @@ class Attention(nn.Module):
             self.q_attn = Conv1D(n_state, nx)
         else:
             self.c_attn = Conv1D(3 * n_state, nx)
+
+        self.flash = False
         self.c_proj = Conv1D(n_state, nx)
-        self.attn_dropout = nn.Dropout(config.attn_pdrop)
+
+        if not self.flash:
+            self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
         self.pruned_heads = set()
 
@@ -232,8 +236,6 @@ class Attention(nn.Module):
             present = torch.stack((key.transpose(-2, -1), value))  # transpose to have same shapes for stacking
         else:
             present = (None,)
-
-        self.flash = False
 
         if not self.flash:
             attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)

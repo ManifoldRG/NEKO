@@ -119,10 +119,9 @@ class Trainer:
 
             self.accelerator.backward(loss)
 
-        raise Exception('check sync_gradients')
-        if not self.args.disable_grad_clip and accelerator.sync_gradients:
-            accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
-            #torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+        # if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
+        #     self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+        #     #torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
         
         self.optimizer.step()
         self.optimizer.zero_grad()
