@@ -67,7 +67,7 @@ class ControlTask(Task):
             ep_returns = np.array([ep.rewards.sum() for ep in self.dataset])
             self.top_ids = np.argsort(ep_returns)[-self.top_k_prompting:]
         else:
-            self.filter_fn = None
+            self.top_ids = None
 
         
         if type(self.env.observation_space) == gym.spaces.Box:
