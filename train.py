@@ -74,8 +74,6 @@ def main(args):
     args.trainable_params = params
 
 
-    model = model.to(args.device)
-    #model = model.to(args.device)
     model.device = args.device
 
     optimizer = torch.optim.AdamW(
