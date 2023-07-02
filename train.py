@@ -6,6 +6,7 @@ import wandb
 import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
+from accelerate import Accelerator
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
@@ -13,7 +14,12 @@ from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.tasks.control_task import ControlTask
 
+
 def main(args):
+    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision)
+    device = accelerator.device
+    args.device = accelerator.device
+
     exp_id = random.randint(int(1e5), int(1e6) - 1)
     exp_name = f'gato-control-{exp_id}'
 
@@ -69,6 +75,7 @@ def main(args):
 
 
     model = model.to(args.device)
+    #model = model.to(args.device)
     model.device = args.device
 
     optimizer = torch.optim.AdamW(
@@ -78,6 +85,9 @@ def main(args):
         eps=args.adam_eps,
         weight_decay=args.weight_decay,
     )
+
+    # setup up Accelerate, without dataloader:
+    model, optimizer = accelerator.prepare(model, optimizer)
 
     if args.use_wandb:
         wandb.init(
@@ -93,6 +103,7 @@ def main(args):
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
+        accelerator = accelerator,
         tasks = tasks,
         exp_name = exp_name,
         args=args
@@ -104,7 +115,17 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--device', type=str, default='cuda') # e.g. cuda:0
+    # Accelerate args
+    parser.add_argument('--cpu', action='store_true', default=False)
+    parser.add_argument(
+        "--mixed_precision",
+        type=str,
+        default=None,
+        choices=["no", "fp16", "bf16", "fp8"],
+        help="Whether to use mixed precision. Choose"
+        "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
+        "and an Nvidia Ampere GPU.",
+    )
 
     # Input & tokenization
     parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
@@ -139,6 +160,7 @@ if __name__ == '__main__':
     parser.add_argument('--lora_dropout', type=float, default=0.1)
 
     # training hyperparameters
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
 
