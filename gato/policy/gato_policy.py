@@ -355,7 +355,6 @@ class GatoPolicy(nn.Module):
 
             action_embeddings = torch.cat([action_embedding for action_embedding in [continuous_action_embeddings, discrete_action_embeddings] if action_embedding is not None], dim=1) # concat action
             batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
-            
             tokens_per_timestep = batch_embeddings.shape[1] # number of tokens per timestep
             total_tokens = n_timesteps * tokens_per_timestep
             

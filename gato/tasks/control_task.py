@@ -43,8 +43,35 @@ class ControlTask(Task):
         assert self.action_type in supported_spaces, f'Unsupported action space: {self.env.action_space}'
         assert self.observation_type in supported_spaces, f'Unsupported observation space: {self.env.observation_space}'
 
+        # Determine types of obseravation, action for task
+        if type(self.env.observation_space) == gym.spaces.Box:
+            if len(self.env.observation_space.shape) == 2 or len(self.env.observation_space.shape) == 3:
+                obs_str = 'images'
+            else:
+                obs_str = 'continuous_obs'
+        elif type(self.env.observation_space) == gym.spaces.Discrete:
+            obs_str = 'discrete_obs'
+        self.obs_str = obs_str
+
+        if obs_str == 'images':
+            self.image_transform = ControlImageTransform(env, args.patch_size)
+        else:
+            self.image_transform = None
+        
+        if type(self.env.action_space) == gym.spaces.Box:
+            action_str = 'continuous_actions'
+        elif type(self.env.action_space) == gym.spaces.Discrete:
+            action_str = 'discrete_actions'
+        self.action_str = action_str
+
+
         self.action_tokens = tokens_per_space(self.env.action_space)
-        self.observation_tokens = tokens_per_space(self.env.observation_space)
+        if obs_str == 'images':
+            # Calculate tokens after image transform
+            image_shape = self.image_transform.transform(torch.tensor(env.observation_space.sample())).shape
+            self.observation_tokens = image_shape[-1] // args.patch_size * image_shape[-2] // args.patch_size
+        else:
+            self.observation_tokens = tokens_per_space(self.env.observation_space)
 
         self.tokens_per_timestep =  self.action_tokens + self.observation_tokens + 1 # additional separator token
         assert context_len >= self.tokens_per_timestep, f'Context length must be at least {self.tokens_per_timestep} for env {env_name}'
@@ -69,27 +96,7 @@ class ControlTask(Task):
         else:
             self.top_ids = None
 
-        
-        if type(self.env.observation_space) == gym.spaces.Box:
-            if len(self.env.observation_space.shape) == 2 or len(self.env.observation_space.shape) == 3:
-                obs_str = 'images'
-            else:
-                obs_str = 'continuous_obs'
-        elif type(self.env.observation_space) == gym.spaces.Discrete:
-            obs_str = 'discrete_obs'
-        self.obs_str = obs_str
-
-        if obs_str == 'images':
-            self.image_transform = ControlImageTransform(env, args.patch_size)
-        else:
-            self.image_transform = None
-        
-        if type(self.env.action_space) == gym.spaces.Box:
-            action_str = 'continuous_actions'
-        elif type(self.env.action_space) == gym.spaces.Discrete:
-            action_str = 'discrete_actions'
-        self.action_str = action_str
-
+    
     def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []

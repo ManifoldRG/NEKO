@@ -120,7 +120,7 @@ def load_tf_weights_in_gpt2(model, config, gpt2_checkpoint_path):
 class Attention(nn.Module):
     def __init__(self, nx, n_ctx, config, scale=False, is_cross_attention=False):
         super().__init__()
-
+        self.config = config
         n_state = nx  # in Attention: n_state=768 (nx=n_embd)
         # [switch nx => n_state from Block to Attention to keep identical to TF implem]
         assert n_state % config.n_head == 0
@@ -169,7 +169,6 @@ class Attention(nn.Module):
             # if only "normal" attention layer implements causal mask
             mask = self.bias[:, :, ns - nd: ns, :ns]
             w = torch.where(mask.bool(), w, self.masked_bias.to(w.dtype))
-
         if attention_mask is not None:
             # Apply the attention mask
             w = w + attention_mask
@@ -233,13 +232,26 @@ class Attention(nn.Module):
         else:
             present = (None,)
 
-        attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)
-        a = attn_outputs[0]
+        self.flash = False
+
+        if not self.flash:
+            attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)
+            a = attn_outputs[0]
+        else:
+            assert head_mask is None, "head_mask not implemented for flash"
+            assert not output_attentions, "output_attentions not implemented for flash"
+            key = key.permute(0, 1, 3, 2) # (batch, head, seq_length, head_features)
+            nd = query.size(-2)
+            ns = key.size(-2)
+            causal_mask = self.bias[:, :, ns - nd: ns, :ns]
+            attention_mask = (-(causal_mask.to(attention_mask.dtype) - 1) * self.masked_bias) + attention_mask
+            a = torch.nn.functional.scaled_dot_product_attention(query, key, value, attn_mask=attention_mask, dropout_p=self.config.attn_pdrop if self.training else 0)
+            attn_outputs = [a]
 
         a = self.merge_heads(a)
         a = self.c_proj(a)
         a = self.resid_dropout(a)
-
+        
         outputs = [a, present] + attn_outputs[1:]
         return outputs  # a, present, (attentions)
 
