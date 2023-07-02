@@ -12,12 +12,14 @@ class Trainer:
         self,
         model,
         optimizer,
+        accelerator,
         tasks,
         exp_name,
         args
     ):
         self.model = model
         self.optimizer = optimizer
+        self.accelerator = accelerator
         self.tasks = tasks
         self.args = args
         self.print_logs = True # args.print_logs
@@ -105,23 +107,27 @@ class Trainer:
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
         
-        # Build training batch
-        batch_dicts = self.sample_control_batch(self.args.batch_size)
+        total_loss = 0
+        for _ in range(self.args.gradient_accumulation_steps):
+            # Build training batch
+            batch_dicts = self.sample_control_batch(self.args.batch_size)
 
-        # Compute loss and update model
-        # if self.steps >= 100:
-        #     logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True, pdb=True)
-        # else:
-        logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
+            # Compute loss and update model
+            logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
+            loss = loss / self.args.gradient_accumulation_steps
+            total_loss += loss.detach().cpu().item() # for logging
 
+            self.accelerator.backward(loss)
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        if not self.args.disable_grad_clip:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+        raise Exception('check sync_gradients')
+        if not self.args.disable_grad_clip and accelerator.sync_gradients:
+            accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+            #torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+        
         self.optimizer.step()
+        self.optimizer.zero_grad()
 
-        return loss.detach().cpu().item(), logs
+        return total_loss, logs
 
     def sample_control_batch(self, batch_size):
         batch_dicts = []
