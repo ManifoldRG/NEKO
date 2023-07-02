@@ -83,7 +83,7 @@ class GatoPolicy(nn.Module):
                 pretrained_lm,
                 config=config,
             )
-            self.embed_dim = config.n_embd
+            embed_dim = config.n_embd
         else:
             config = transformers.GPT2Config(
                 vocab_size=1,  # doesn't matter -- we don't use the vocab

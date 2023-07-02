@@ -5,6 +5,8 @@ import os
 import wandb
 import torch
 
+from peft import LoraConfig, TaskType, get_peft_model
+
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
@@ -49,16 +51,22 @@ def main(args):
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
     )
+    args.embed_dim = model.embed_dim
+    
+    if args.lora:
+        assert args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
+        peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout)
+        model.transformer = get_peft_model(model.transformer, peft_config)
 
     if args.init_checkpoint is not None:
         print('Loading model from checkpoint:', args.init_checkpoint)
         model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
 
-
     # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('Trainable Parameters:', '{}M'.format(params / 1e6))
     args.trainable_params = params
+
 
     model = model.to(args.device)
     model.device = args.device
@@ -124,6 +132,12 @@ if __name__ == '__main__':
     parser.add_argument('--activation_fn', type=str, default='gelu')
     #parser.add_argument('--activation_fn', type=str, default='geglu')
 
+    # PEFT hyperparameters
+    parser.add_argument('--lora', action='store_true', default=False)
+    parser.add_argument('--lora_r', type=int, default=8)
+    parser.add_argument('--lora_alpha', type=int, default=32)
+    parser.add_argument('--lora_dropout', type=float, default=0.1)
+
     # training hyperparameters
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
@@ -145,6 +159,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_steps', type=int, default=1_000_000)
     parser.add_argument('--log_eval_freq', type=int, default=100_000)
+
 
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=10)
