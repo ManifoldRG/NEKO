@@ -79,7 +79,7 @@ def main(args):
     )
 
     # setup up Accelerate, without dataloader:
-    accelerator.prepare(model, optimizer)
+    model, optimizer = accelerator.prepare(model, optimizer)
 
     if args.use_wandb:
         wandb.init(
