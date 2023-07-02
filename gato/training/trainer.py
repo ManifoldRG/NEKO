@@ -108,6 +108,7 @@ class Trainer:
             param_group['lr'] = lr
         
         total_loss = 0
+        self.optimizer.zero_grad()
         for _ in range(self.args.gradient_accumulation_steps):
             # Build training batch
             batch_dicts = self.sample_control_batch(self.args.batch_size)
@@ -116,15 +117,12 @@ class Trainer:
             logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
             loss = loss / self.args.gradient_accumulation_steps
             total_loss += loss.detach().cpu().item() # for logging
-
             self.accelerator.backward(loss)
 
-        # if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
-        #     self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
-        #     #torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+        if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
+            self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
         
         self.optimizer.step()
-        self.optimizer.zero_grad()
 
         return total_loss, logs
 

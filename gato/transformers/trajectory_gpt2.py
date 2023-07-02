@@ -137,12 +137,8 @@ class Attention(nn.Module):
             self.q_attn = Conv1D(n_state, nx)
         else:
             self.c_attn = Conv1D(3 * n_state, nx)
-
-        self.flash = False
         self.c_proj = Conv1D(n_state, nx)
-
-        if not self.flash:
-            self.attn_dropout = nn.Dropout(config.attn_pdrop)
+        self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
         self.pruned_heads = set()
 
@@ -236,6 +232,8 @@ class Attention(nn.Module):
             present = torch.stack((key.transpose(-2, -1), value))  # transpose to have same shapes for stacking
         else:
             present = (None,)
+
+        self.flash = False
 
         if not self.flash:
             attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)
@@ -619,6 +617,7 @@ class GPT2Model(GPT2PreTrainedModel):
             output_attentions=None,
             output_hidden_states=None,
             return_dict=None,
+            labels=None # added for PEFT
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
