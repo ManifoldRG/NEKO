@@ -1,5 +1,6 @@
 import os
 import json
+from copy import deepcopy
 
 import torch
 
@@ -10,8 +11,12 @@ class DotDict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+    def __deepcopy__(self, memo=None):
+        return DotDict(deepcopy(dict(self), memo=memo))
 
-def save_model(model, save_dir, save_name, args):
+
+
+def save_model(model, save_dir, save_name, config_args):
     # create save dir if not exists
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -20,7 +25,9 @@ def save_model(model, save_dir, save_name, args):
     args_path = os.path.join(save_dir, 'args.json')
     if not os.path.exists(args_path):
         with open(args_path, 'w') as f:
-            json.dump(args, f)
+            save_args = deepcopy(config_args)
+            save_args.device = str(save_args.device)
+            json.dump(save_args, f)
     
     # save model
     state_dict = model.state_dict()
