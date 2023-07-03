@@ -7,16 +7,18 @@ import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
+import transformers
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
+from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 
 
 def main(args):
-    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision)
+    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps)
     device = accelerator.device
     args.device = accelerator.device
 
@@ -66,8 +68,9 @@ def main(args):
         model.transformer = get_peft_model(model.transformer, peft_config)
 
     if args.init_checkpoint is not None:
-        print('Loading model from checkpoint:', args.init_checkpoint)
-        model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
+        with accelerator.main_process_first():
+            print('Loading model from checkpoint:', args.init_checkpoint)
+            model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
 
     # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -85,8 +88,15 @@ def main(args):
         weight_decay=args.weight_decay,
     )
 
+    # Setup scheduler
+    if args.disable_cosine_decay:
+        scheduler = transformers.get_constant_schedule_with_warmup(optimizer, args.warmup_steps)
+    else:
+        # Custom scheduler
+        scheduler = get_linear_warmup_cosine_decay_scheduler(optimizer, args.warmup_steps, args.training_steps, base_lr=args.lr, init_lr=args.init_lr, min_lr=args.lr / args.min_factor)
+
     # setup up Accelerate, without dataloader:
-    model, optimizer = accelerator.prepare(model, optimizer)
+    model, optimizer, scheduler = accelerator.prepare(model, optimizer, scheduler)
 
     if args.use_wandb:
         wandb.init(
@@ -102,6 +112,7 @@ def main(args):
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
+        scheduler = scheduler,
         accelerator = accelerator,
         tasks = tasks,
         exp_name = exp_name,

@@ -13,12 +13,14 @@ class Trainer:
         model,
         optimizer,
         accelerator,
+        scheduler,
         tasks,
         exp_name,
         args
     ):
         self.model = model
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.accelerator = accelerator
         self.tasks = tasks
         self.args = args
@@ -39,12 +41,15 @@ class Trainer:
         iters = self.args.training_steps // self.args.log_eval_freq
         for i in range(iters):
             logs = self.train_iteration(self.args.log_eval_freq, i)
-            if self.args.use_wandb:
+            if self.args.use_wandb and self.accelerator.is_main_process:
                 wandb.log(logs)
         
         ## Save model at end of training only if not saving checkpoints
         if self.args.save_model and self.args.save_mode == 'last':
-            save_model(self.model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
+            self.accelerator.wait_for_everyone()
+            if self.accelerator.is_main_process:
+                unwrapped_model = self.accelerator.unwrap_model(self.model)
+                save_model(unwrapped_model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
 
     
     def train_iteration(self, num_steps, iter):
@@ -81,50 +86,42 @@ class Trainer:
         logs['training/train_loss_mean'] = np.mean(train_losses)
         logs['training/train_loss_std'] = np.std(train_losses)
 
-        if self.print_logs:
-            print('=' * 80)
-            print(f'Iteration {iter}')
-            for k, v in logs.items():
-                print(f'{k}: {v}')
+        if self.accelerator.is_main_process:
+            if self.print_logs:
+                print('=' * 80)
+                print(f'Iteration {iter}')
+                for k, v in logs.items():
+                    print(f'{k}: {v}')
         
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':
-            save_model(self.model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
+            self.accelerator.wait_for_everyone()
+            if self.accelerator.is_main_process:
+                unwrapped_model = self.accelerator.unwrap_model(self.model)
+                save_model(unwrapped_model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
 
         return logs
 
     def train_step(self):
         logs = {}
-        base_lr = self.args.learning_rate
-        min_lr = self.min_lr
-        init_lr = self.args.init_lr
-
-        # Calculate learning rate relative to current step
-        lr = linear_warmup_cosine_decay(self.steps, self.args.warmup_steps, self.args.training_steps, base_lr, init_lr, min_lr, disable_cosine_decay=self.args.disable_cosine_decay)
-        logs['training/learning_rate'] = lr
-
-        # Apply
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
+        logs['training/learning_rate'] = self.scheduler.get_lr() # store LR at current step
         
-        total_loss = 0
-        self.optimizer.zero_grad()
-        for _ in range(self.args.gradient_accumulation_steps):
-            # Build training batch
-            batch_dicts = self.sample_control_batch(self.args.batch_size)
+        # Build training batch
+        batch_dicts = self.sample_control_batch(self.args.batch_size)
 
+        with self.accelerator.accumulate(self.model):
             # Compute loss and update model
             logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
-            loss = loss / self.args.gradient_accumulation_steps
-            total_loss += loss.detach().cpu().item() # for logging
             self.accelerator.backward(loss)
 
-        if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
-            self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
-        
-        self.optimizer.step()
+            if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
+                self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
+            
+            self.optimizer.step()
+            self.scheduler.step()
+            self.optimizer.zero_grad()
 
-        return total_loss, logs
+        return loss.detach().cpu().item(), logs
 
     def sample_control_batch(self, batch_size):
         batch_dicts = []
@@ -164,32 +161,3 @@ class Trainer:
                 task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
                 batch_dicts.extend(task_episode_dicts)
         return batch_dicts   
-
-def linear_warmup_cosine_decay(current_step, warmup_steps, max_steps, base_lr, init_lr, min_lr, disable_cosine_decay=False):
-    # Linear Warmup from init_lr to base_lr over warmup_steps
-    if current_step <= warmup_steps:
-        lr = init_lr + (base_lr - init_lr) * current_step / warmup_steps
-    elif not disable_cosine_decay:
-        # cosine decay from base_lr to min_lr over remaining steps
-        progress = (current_step - warmup_steps) / float(max(1, max_steps - warmup_steps))
-        lr = min_lr + 0.5 * (base_lr - min_lr) * (1 + np.cos(np.pi * progress))
-    else:
-        lr = base_lr
-    return lr
-
-
-if __name__ == '__main__':
-
-    # Test LR schedule
-    import matplotlib.pyplot as plt
-    init_lr = 1e-7
-    base_lr = 1e-4
-    min_lr = base_lr / 10
-    warmup_steps = 15_000
-    max_steps = 1_015_000
-    current_steps = np.arange(1, max_steps + 1)
-    lr = np.zeros_like(current_steps, dtype=np.float32)
-    for step in current_steps:
-        lr[step - 1] = linear_warmup_cosine_decay(step, warmup_steps, max_steps, base_lr, init_lr, min_lr)
-    plt.plot(current_steps, lr)
-    plt.show()
