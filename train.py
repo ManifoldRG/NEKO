@@ -56,6 +56,7 @@ def main(args):
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
+        flash=args.flash
     )
     args.embed_dim = model.embed_dim
     
@@ -143,6 +144,7 @@ if __name__ == '__main__':
 
     # transformer architecture hyperparameters
     parser.add_argument('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
+    parser.add_argument('--flash', default=False, action='store_true') # enable flash attention
     parser.add_argument('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
 
     parser.add_argument('--embed_dim', type=int, default=768)

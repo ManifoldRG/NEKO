@@ -137,6 +137,7 @@ class Attention(nn.Module):
             self.q_attn = Conv1D(n_state, nx)
         else:
             self.c_attn = Conv1D(3 * n_state, nx)
+        self.flash = config.__dict__.get('flash', False)
         self.c_proj = Conv1D(n_state, nx)
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
@@ -233,7 +234,6 @@ class Attention(nn.Module):
         else:
             present = (None,)
 
-        self.flash = False
 
         if not self.flash:
             attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)
