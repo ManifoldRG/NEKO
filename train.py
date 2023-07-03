@@ -89,11 +89,7 @@ def main(args):
     )
 
     # Setup scheduler
-    if args.disable_cosine_decay:
-        scheduler = transformers.get_constant_schedule_with_warmup(optimizer, args.warmup_steps)
-    else:
-        # Custom scheduler
-        scheduler = get_linear_warmup_cosine_decay_scheduler(optimizer, args.warmup_steps, args.training_steps, base_lr=args.lr, init_lr=args.init_lr, min_lr=args.lr / args.min_factor)
+    scheduler = get_linear_warmup_cosine_decay_scheduler(optimizer, args.warmup_steps, args.training_steps, base_lr=args.learning_rate, init_lr=args.init_lr, min_lr=args.learning_rate / args.min_factor, cosine_decay=not args.disable_cosine_decay)
 
     # setup up Accelerate, without dataloader:
     model, optimizer, scheduler = accelerator.prepare(model, optimizer, scheduler)
