@@ -6,6 +6,8 @@ import time
 import numpy as np
 import torch
 
+from peft import LoraConfig, TaskType, get_peft_model
+
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
@@ -24,8 +26,8 @@ def main(args):
         args_path = args.args_path
     
     training_args = json.load(open(args_path, 'r'))
-    if 'pretrained_lm' in training_args:
-        del training_args['pretrained_lm']
+    if not ('lora' in training_args and training_args['lora']):
+        training_args['pretrained_lm'] = None
 
     # update args with eval_args
     for k, v in args.items():
@@ -72,7 +74,15 @@ def main(args):
         use_patch_pos_encoding=not eval_args.disable_patch_pos_encoding,
         use_pos_encoding=not eval_args.disable_inner_pos_encoding,
         activation_fn=eval_args.activation_fn,
+        pretrained_lm=eval_args.pretrained_lm,
+        flash=eval_args.flash
     )
+
+    if eval_args.get('lora', False):
+        assert eval_args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
+        peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=eval_args.lora_r, lora_alpha=eval_args.lora_alpha, lora_dropout=eval_args.lora_dropout)
+        model.transformer = get_peft_model(model.transformer, peft_config)
+
     model.load_state_dict(gato_checkpoint)
     model = model.to(eval_args.device)
     model.device = eval_args.device
