@@ -38,7 +38,8 @@ class GatoPolicy(nn.Module):
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
 
-        pretrained_lm: str = None # Optional, name of pretrained language model to use
+        pretrained_lm: str = None, # Optional, name of pretrained language model to use
+        flash: bool = False # TODO, verify correctness
     ):
         super().__init__()
 
@@ -79,11 +80,12 @@ class GatoPolicy(nn.Module):
             config = transformers.GPT2Config.from_pretrained(pretrained_lm)
             config.attn_pdrop = dropout # 0.1
             config.resid_pdrop = dropout
+            config.flash = flash
             self.transformer = GPT2Model.from_pretrained(
                 pretrained_lm,
                 config=config,
             )
-            self.embed_dim = config.n_embd
+            embed_dim = config.n_embd
         else:
             config = transformers.GPT2Config(
                 vocab_size=1,  # doesn't matter -- we don't use the vocab
@@ -96,6 +98,7 @@ class GatoPolicy(nn.Module):
                 n_inner=embed_dim * 4,
                 activation_function=activation_fn,
             )
+            config.flash = flash
             config.n_ctx = context_len
             self.transformer = self.transformer = GPT2Model(config)
 

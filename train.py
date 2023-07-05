@@ -5,13 +5,23 @@ import os
 import wandb
 import torch
 
+from peft import LoraConfig, TaskType, get_peft_model
+from accelerate import Accelerator
+import transformers
+
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
+from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 
+
 def main(args):
+    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps)
+    device = accelerator.device
+    args.device = accelerator.device
+
     exp_id = random.randint(int(1e5), int(1e6) - 1)
     exp_name = f'gato-control-{exp_id}'
 
@@ -48,19 +58,26 @@ def main(args):
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
+        flash=args.flash
     )
+    args.embed_dim = model.embed_dim
+    
+    if args.lora:
+        assert args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
+        peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout)
+        model.transformer = get_peft_model(model.transformer, peft_config)
 
     if args.init_checkpoint is not None:
-        print('Loading model from checkpoint:', args.init_checkpoint)
-        model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
-
+        with accelerator.main_process_first():
+            print('Loading model from checkpoint:', args.init_checkpoint)
+            model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
 
     # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('Trainable Parameters:', '{}M'.format(params / 1e6))
     args.trainable_params = params
 
-    model = model.to(args.device)
+
     model.device = args.device
 
     optimizer = torch.optim.AdamW(
@@ -70,6 +87,12 @@ def main(args):
         eps=args.adam_eps,
         weight_decay=args.weight_decay,
     )
+
+    # Setup scheduler
+    scheduler = get_linear_warmup_cosine_decay_scheduler(optimizer, args.warmup_steps, args.training_steps, base_lr=args.learning_rate, init_lr=args.init_lr, min_lr=args.learning_rate / args.min_factor, cosine_decay=not args.disable_cosine_decay)
+
+    # setup up Accelerate, without dataloader:
+    model, optimizer, scheduler = accelerator.prepare(model, optimizer, scheduler)
 
     if args.use_wandb:
         wandb.init(
@@ -85,6 +108,8 @@ def main(args):
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
+        scheduler = scheduler,
+        accelerator = accelerator,
         tasks = tasks,
         exp_name = exp_name,
         args=args
@@ -96,7 +121,17 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--device', type=str, default='cuda') # e.g. cuda:0
+    # Accelerate args
+    parser.add_argument('--cpu', action='store_true', default=False)
+    parser.add_argument(
+        "--mixed_precision",
+        type=str,
+        default=None,
+        choices=["no", "fp16", "bf16", "fp8"],
+        help="Whether to use mixed precision. Choose"
+        "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
+        "and an Nvidia Ampere GPU.",
+    )
 
     # Input & tokenization
     parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
@@ -116,6 +151,7 @@ if __name__ == '__main__':
 
     # transformer architecture hyperparameters
     parser.add_argument('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
+    parser.add_argument('--flash', default=False, action='store_true') # enable flash attention
     parser.add_argument('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
 
     parser.add_argument('--embed_dim', type=int, default=768)
@@ -124,7 +160,14 @@ if __name__ == '__main__':
     parser.add_argument('--activation_fn', type=str, default='gelu')
     #parser.add_argument('--activation_fn', type=str, default='geglu')
 
+    # PEFT hyperparameters
+    parser.add_argument('--lora', action='store_true', default=False)
+    parser.add_argument('--lora_r', type=int, default=8)
+    parser.add_argument('--lora_alpha', type=int, default=32)
+    parser.add_argument('--lora_dropout', type=float, default=0.1)
+
     # training hyperparameters
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
 
@@ -145,6 +188,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_steps', type=int, default=1_000_000)
     parser.add_argument('--log_eval_freq', type=int, default=100_000)
+
 
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=10)
