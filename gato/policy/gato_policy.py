@@ -81,12 +81,17 @@ class GatoPolicy(nn.Module):
             config.attn_pdrop = dropout # 0.1
             config.resid_pdrop = dropout
             config.flash = flash
+            config.gate = False
             self.transformer = GPT2Model.from_pretrained(
                 pretrained_lm,
                 config=config,
             )
             embed_dim = config.n_embd
         else:
+            gate = False
+            if activation_fn == 'geglu':
+                gate = True
+                activation_fn = 'gelu'
             config = transformers.GPT2Config(
                 vocab_size=1,  # doesn't matter -- we don't use the vocab
                 n_embd=embed_dim,
@@ -100,6 +105,7 @@ class GatoPolicy(nn.Module):
             )
             config.flash = flash
             config.n_ctx = context_len
+            config.gate = gate
             self.transformer = self.transformer = GPT2Model(config)
 
         self.embed_dim = embed_dim
