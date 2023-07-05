@@ -104,7 +104,7 @@ class Trainer:
 
     def train_step(self):
         logs = {}
-        logs['training/learning_rate'] = self.scheduler.get_lr() # store LR at current step
+        logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
         
         # Build training batch
         batch_dicts = self.sample_control_batch(self.args.batch_size)
