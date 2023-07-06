@@ -7,6 +7,8 @@ import numpy as np
 import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
+from accelerate import Accelerator
+
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
@@ -77,13 +79,18 @@ def main(args):
         pretrained_lm=eval_args.pretrained_lm,
         flash=eval_args.flash
     )
-
     if eval_args.get('lora', False):
         assert eval_args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
         peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=eval_args.lora_r, lora_alpha=eval_args.lora_alpha, lora_dropout=eval_args.lora_dropout)
         model.transformer = get_peft_model(model.transformer, peft_config)
 
     model.load_state_dict(gato_checkpoint)
+
+    accelerator = Accelerator(cpu=eval_args.cpu, mixed_precision=eval_args.mixed_precision)
+    model = accelerator.prepare(model)
+    eval_args.device = accelerator.device                
+
+
     model = model.to(eval_args.device)
     model.device = eval_args.device
 
@@ -111,7 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None) # path to model checkpoint
     parser.add_argument('--args_path', type=str, default=None) # path to args.json file, will use args from same dir if None
 
-    parser.add_argument('--device', type=str, default='cuda') # e.g. cuda:0
+    parser.add_argument('--cpu', default=False, action='store_true')
 
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=None)
