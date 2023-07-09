@@ -39,7 +39,7 @@ Training on 3 MuJoCo locomotion tasks:
 ```bash
 python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=100000 --log_eval_freq=10000 --warmup_steps=10000 --batch_size=32 -k=240 --eval_episodes=10 --activation_fn=gelu --save_model --save_mode=checkpoint --datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2 -w
 ```
-results of run: https://wandb.ai/daniellawson9999/gato-control/runs/5yfksnce?workspace=user-daniellawson9999
+example run log: https://wandb.ai/daniellawson9999/gato-control/runs/j9u26q9p/overview?workspace=user-daniellawson9999
 
 
 Atari (not tested):
