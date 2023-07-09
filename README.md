@@ -90,7 +90,7 @@ logits, loss = model([
 ```
 
 # Future
-Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/todo.md).  
+Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/misc/todo.md).  
 
 # Credits
 
