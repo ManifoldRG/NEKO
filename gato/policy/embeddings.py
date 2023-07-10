@@ -55,7 +55,7 @@ class ImageEmbedding(nn.Module):
         # now add positional encoding
         if self.use_pos_encoding:
             x = x + self.patch_pos_encoding(x)
-
+            
         x = rearrange(x, 'b n_h n_w embed_dim -> b (n_h n_w) embed_dim')
 
         return x
