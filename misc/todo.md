@@ -12,6 +12,7 @@ things to add:
 - add/test geglu over gelu in transformer blocks
 - TransformerXL style memory during inference
 - batched inference
+- could try RoboCat style VQGAN image tokenization. Train VQGAN or test using a pretrained. 
 
 Purposeful changes from Gato:
 - added gradient clipping (can be disabled)
