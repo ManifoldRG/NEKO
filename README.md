@@ -42,10 +42,11 @@ python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=100000 --
 example run log: https://wandb.ai/daniellawson9999/gato-control/runs/j9u26q9p/overview?workspace=user-daniellawson9999
 
 
-Atari (not tested):
+Atari (in progress):
 ```bash
 python train.py --embed_dim=128 --layers=3 --heads=1 --training_steps=10000 --log_eval_freq=1 --warmup_steps=100 --batch_size=4 -k=512 --eval_episodes=1 --device=cuda --datasets Breakout-expert_s0-v0
 ```
+example run log: https://wandb.ai/daniellawson9999/gato-control/runs/qagorj06/workspace?workspace=user-daniellawson9999\
 
 In general, datasets can contain lists of any strings in download_custom_datasets.py or a dataset in https://minari.farama.org/ with Box or Discrete observation or action spaces, although these environments have not been tested yet. 
 for example:
