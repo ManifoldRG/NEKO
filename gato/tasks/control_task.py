@@ -109,9 +109,12 @@ class ControlTask(Task):
             observation, info = self.env.reset()
 
             # sample prompt
-            if not promptless_eval:
-                input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True,ep_ids=self.top_ids)[0]
-            else:
+            input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True,ep_ids=self.top_ids)[0]
+            
+            # infer dtypes
+            action_type = input_dict[self.action_str].dtype
+
+            if promptless_eval:
                 input_dict = None
 
             done = False
@@ -124,11 +127,11 @@ class ControlTask(Task):
                 # append new observation, and pad actions
                 if input_dict is not None:
                     input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
-                    input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=input_dict[self.action_str].dtype)], dim=0)
+                    input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)], dim=0)
                 else:
                     input_dict = {
                         self.obs_str: new_obs,
-                        self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=torch.float32),
+                        self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type),
                     }
 
                 # trim to context length
