@@ -61,7 +61,8 @@ def main(args):
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
-        flash=args.flash
+        flash=args.flash,
+        pad_seq=args.pad_seq,
     )
     args.embed_dim = model.embed_dim
     model = accelerator.prepare(model)
@@ -193,6 +194,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_steps', type=int, default=1_000_000)
     parser.add_argument('--log_eval_freq', type=int, default=100_000)
+
+    parser.add_argument('--pad_seq', action='store_true', default=False) # pad sequences to max length
 
 
     # evaluation
