@@ -7,6 +7,8 @@ import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
+from accelerate import DistributedDataParallelKwargs
+
 import transformers
 
 from gato.utils.utils import DotDict
@@ -18,7 +20,8 @@ from gato.tasks.control_task import ControlTask
 
 
 def main(args):
-    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps)
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
     device = accelerator.device
     args.device = accelerator.device
 
