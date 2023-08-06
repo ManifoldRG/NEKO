@@ -1,10 +1,22 @@
 import torch
 import torch.nn as nn
 import math
+from transformers import BertTokenizer
 
-def mu_law(tensor, mu=100, M=256): 
+def mu_law(tensor, mu=100, M=256):
     return torch.sign(tensor) * torch.log(1 + mu * torch.abs(tensor)) / math.log(1 + mu*M) #torch.log(1 + mu*M)
 
+
+class TextTokenizer:
+    def __init__(self):
+        # for now using Bert here, but we can switch to a different tokenizer
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+    def encode(self, text):
+        return self.tokenizer.encode(text)
+
+    def decode(self, tokens):
+        return self.tokenizer.decode(tokens)
 
 class ContinuousTokenizer:
     def __init__(self, use_mu_law=True, mu=100, M=256, n_bins=1024, offset=None):
@@ -13,7 +25,7 @@ class ContinuousTokenizer:
         self.M = M
         self.n_bins = n_bins
         self.offset = offset
-    
+
     def encode(self, tensor):
         if self.use_mu_law:
             tensor = mu_law(tensor, self.mu, self.M)
@@ -28,11 +40,11 @@ class ContinuousTokenizer:
             tensor += self.offset
 
         return tensor
-    
+
     def decode(self, tensor):
         if self.use_mu_law:
             raise Exception("mu-law encoding only expected with values which are not predicted")
-        
+
         if self.offset is not None:
             tensor -= self.offset
 
@@ -51,5 +63,3 @@ if __name__ == '__main__':
     tokenizer = ContinuousTokenizer(use_mu_law=True, offset=0)
     #input = (-1 - 1) * torch.rand(1, 10) + 1
     encoded = tokenizer.encode(input)
-
-

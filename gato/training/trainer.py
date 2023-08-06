@@ -35,7 +35,7 @@ class Trainer:
 
         self.steps = 0
         self.start_time = None
-    
+
     def train(self):
         self.start_time = time.time()
         iters = self.args.training_steps // self.args.log_eval_freq
@@ -43,7 +43,7 @@ class Trainer:
             logs = self.train_iteration(self.args.log_eval_freq, i)
             if self.args.use_wandb and self.accelerator.is_main_process:
                 wandb.log(logs)
-        
+
         ## Save model at end of training only if not saving checkpoints
         if self.args.save_model and self.args.save_mode == 'last':
             self.accelerator.wait_for_everyone()
@@ -51,7 +51,7 @@ class Trainer:
                 unwrapped_model = self.accelerator.unwrap_model(self.model)
                 save_model(unwrapped_model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
 
-    
+
     def train_iteration(self, num_steps, iter):
         logs = {}
 
@@ -64,7 +64,7 @@ class Trainer:
             self.steps += 1
             train_loss, step_logs = self.train_step()
             train_losses.append(train_loss)
-        
+
         # add logs from last train_step as well
         for log in step_logs:
             logs[log] = step_logs[log]
@@ -73,7 +73,7 @@ class Trainer:
 
         eval_start = time.time()
         self.model.eval()
-        
+
         # loop over eval for each env
         with torch.no_grad():
             for task in self.tasks:
@@ -92,7 +92,7 @@ class Trainer:
                 print(f'Iteration {iter}')
                 for k, v in logs.items():
                     print(f'{k}: {v}')
-        
+
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':
             self.accelerator.wait_for_everyone()
@@ -105,7 +105,7 @@ class Trainer:
     def train_step(self):
         logs = {}
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
-        
+
         # Build training batch
         batch_dicts = self.sample_control_batch(self.args.batch_size)
 
@@ -116,7 +116,7 @@ class Trainer:
 
             if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
                 self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
-            
+
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
@@ -160,4 +160,4 @@ class Trainer:
             if total_task_batch_size > 0:
                 task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
                 batch_dicts.extend(task_episode_dicts)
-        return batch_dicts   
+        return batch_dicts
