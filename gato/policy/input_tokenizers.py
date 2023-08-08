@@ -7,6 +7,16 @@ def mu_law(tensor, mu=100, M=256):
     return torch.sign(tensor) * torch.log(1 + mu * torch.abs(tensor)) / math.log(1 + mu*M) #torch.log(1 + mu*M)
 
 
+class TextTokenizerGPT2:
+    def __init__(self, pretrained_model_name='gpt2'):
+        self.tokenizer = GPT2Tokenizer.from_pretrained(pretrained_model_name)
+
+    def encode(self, text_sequences):
+        return self.tokenizer(text_sequences, truncation=True, padding='longest', return_tensors='pt')
+
+    def decode(self, tokens):
+        return self.tokenizer.decode(tokens)
+
 class TextTokenizer:
     def __init__(self):
         # for now using Bert here, but we can switch to a different tokenizer

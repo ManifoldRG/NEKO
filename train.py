@@ -15,6 +15,7 @@ from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
+from datasets import load_dataset
 
 
 def main(args):
@@ -27,11 +28,14 @@ def main(args):
 
     envs, datasets = load_envs(args.datasets) # Load Minari datasets and corresponding Gym environments
 
+    # load the text dataset
+    text_dataset = load_dataset('wikitext', 'wikitext-103-raw-v1')
+
     tasks = []
     for env, dataset in zip(envs, datasets):
         task = ControlTask(
-            env.unwrapped.spec.id, 
-            env, 
+            env.unwrapped.spec.id,
+            env,
             dataset,
             args = args,
             context_len = args.sequence_length,
@@ -61,7 +65,7 @@ def main(args):
         flash=args.flash
     )
     args.embed_dim = model.embed_dim
-    
+
     if args.lora:
         assert args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
         peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout)
@@ -111,6 +115,7 @@ def main(args):
         scheduler = scheduler,
         accelerator = accelerator,
         tasks = tasks,
+        text_dataset = text_dataset,
         exp_name = exp_name,
         args=args
     )
@@ -143,7 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('--disable_inner_pos_encoding', action='store_true', default=False)
 
     parser.add_argument('--mu','-mu', type=int, default=100) # mu-law encoding
-    parser.add_argument('--M', '-M', type=int, default=256) 
+    parser.add_argument('--M', '-M', type=int, default=256)
 
     #parser.add_argument('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
     parser.add_argument('--continuous_tokens', type=int, default=1024) # number of tokens for continuous values (e.g. actions, observations)
@@ -182,7 +187,7 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_steps', type=int, default=15000)
     parser.add_argument('--init_lr', type=float, default=1e-7) # starting LR for warmup
     parser.add_argument('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR after warmup
-    
+
     parser.add_argument('--min_factor', type=float, default=10.0) # the minimum LR factor, e.g. w/ 10, base 1e-4 -> 1e-5 for Cosine Decay
     parser.add_argument('--disable_cosine_decay', action='store_true', default=False) # disable cosine decay
 
@@ -212,7 +217,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_model', action='store_true', default=False)
     parser.add_argument('--save_mode', type=str, default='last', choices=['checkpoint', 'last']) # Checkpoit saves model every after each log_eval_freq steps
     parser.add_argument('--save_dir', type=str, default='models')
-    
+
     args = parser.parse_args()
     args = DotDict(vars(args))
 

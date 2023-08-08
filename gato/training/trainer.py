@@ -15,6 +15,7 @@ class Trainer:
         accelerator,
         scheduler,
         tasks,
+        text_dataset,
         exp_name,
         args
     ):
@@ -32,6 +33,7 @@ class Trainer:
 
         self.exp_name = exp_name
         self.exp_dir = os.path.join(self.args.save_dir, self.exp_name)
+        self.text_dataset = text_dataset
 
         self.steps = 0
         self.start_time = None
@@ -80,6 +82,7 @@ class Trainer:
                 eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/{task.name}/{k}'] = v
+            # todo : add text eval as well.
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
@@ -107,7 +110,11 @@ class Trainer:
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
 
         # Build training batch
-        batch_dicts = self.sample_control_batch(self.args.batch_size)
+        # for simplicity sake - assume interleave training on control & text
+        if self.steps % 2 == 0:
+            batch_dicts = self.sample_control_batch(self.args.batch_size)
+        else:
+            batch_dicts = self.process_text_batch(next(iter(self.text_dataset)))
 
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
@@ -122,6 +129,24 @@ class Trainer:
             self.optimizer.zero_grad()
 
         return loss.detach().cpu().item(), logs
+
+    def process_text_batch(self, batch_size):
+        # Select batch_size number of random indices from the size of the text dataset.
+        random_indices = np.random.randint(0, len(self.text_dataset['train']), size=batch_size)
+        selected_text_examples = [self.text_dataset['train'][idx]['text'] for idx in random_indices]
+
+        input_dict = {}
+
+        text_tokens = [self.model.text_tokenizer.encode(text) for text in selected_text_examples]
+        input_dict['text'] = torch.stack(text_tokens).to(self.args.device)
+        # The targets are the same as the input, but shifted one position to the left
+        # append the appropriate end-of-sequence token as well
+        input_dict['text_targets'] = torch.cat(
+            [tokens[1:], torch.tensor([self.model.text_tokenizer.tokenizer.eos_token_id]).expand(1, tokens.shape[1])],
+            dim=0
+        ).to(self.args.device)
+
+        return input_dict
 
     def sample_control_batch(self, batch_size):
         batch_dicts = []

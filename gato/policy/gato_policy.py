@@ -9,14 +9,14 @@ import transformers
 # import gato
 from gato.transformers import HFGPT, GPT2Model
 from gato.policy.embeddings import ImageEmbedding
-from gato.policy.input_tokenizers import ContinuousTokenizer
+from gato.policy.input_tokenizers import ContinuousTokenizer, TextTokenizerGPT2
 from gato.tasks.control_task import ControlTask
 
 class GatoPolicy(nn.Module):
     def __init__(
         self,
         device: str,
-        embed_dim: int, 
+        embed_dim: int,
         layers: int,
         heads: int,
         dropout: float,
@@ -52,7 +52,7 @@ class GatoPolicy(nn.Module):
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
-        
+
         # order of text, continuous, discrete
         self.token_starts = {
             'text': 0,
@@ -117,12 +117,12 @@ class GatoPolicy(nn.Module):
         self.separator_token = nn.Parameter(torch.zeros(embed_dim))
 
         # Tokenizers
-        self.text_tokenizer = None # e.g. SentencePiece
+        self.text_tokenizer = TextTokenizerGPT2()
 
         self.continuous_action_tokenizer = ContinuousTokenizer(
             use_mu_law=False, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
         ) # continuous actions expected to be in [-1, 1]
-        
+
         self.continuous_obs_tokenizer = ContinuousTokenizer(
             use_mu_law=True, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
         )
@@ -184,7 +184,7 @@ class GatoPolicy(nn.Module):
                 import pdb; pdb.set_trace()
         else:
             loss = None
-        
+
         return logits, loss
 
 
@@ -201,7 +201,7 @@ class GatoPolicy(nn.Module):
 
                 # actions
                 continuous_actions: T x A or None
-                discrete_actions: T x B or None 
+                discrete_actions: T x B or None
             },
             ...
             {
@@ -253,8 +253,7 @@ class GatoPolicy(nn.Module):
 
             # tokenize text
             if 'text' in batch and batch['text'] is not None:
-                raise NotImplementedError
-                text_tokens = self.text_tokenizer.tokenize(batch['text'])
+                text_tokens = self.text_tokenizer.encode(batch['text'])
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets = torch.ones_like(text_tokens)
                 n_timesteps = text_tokens.shape[0]
@@ -273,7 +272,7 @@ class GatoPolicy(nn.Module):
                     n_timesteps = n_images
                 else:
                     assert n_timesteps == n_images, "number of timesteps must be the same for all modalities"
-            
+
             if 'continuous_obs' in batch and batch['continuous_obs'] is not None:
                 continuous_tokens = self.continuous_obs_tokenizer.encode(batch['continuous_obs'])
                 continuous_embeddings = self.embed_token(continuous_tokens)
@@ -283,7 +282,7 @@ class GatoPolicy(nn.Module):
                     n_timesteps = continuous_tokens.shape[0]
                 else:
                     assert n_timesteps == continuous_tokens.shape[0], "number of timesteps must be the same for all modalities"
-            
+
             if 'discrete_obs' in batch and batch['discrete_obs'] is not None:
                 discrete_tokens = batch['discrete_obs']
                 discrete_tokens = discrete_tokens + self.token_starts['discrete'] # add offset
@@ -294,12 +293,12 @@ class GatoPolicy(nn.Module):
                     n_timesteps = discrete_tokens.shape[0]
                 else:
                     assert n_timesteps == discrete_tokens.shape[0], "number of timesteps must be the same for all modalities"
-            
+
             if 'continuous_actions' in batch and batch['continuous_actions'] is not None:
                 continuous_action_tokens = self.continuous_action_tokenizer.encode(batch['continuous_actions'])
                 continuous_action_embeddings = self.embed_token(continuous_action_tokens)
                 continuous_action_targets = torch.ones_like(continuous_action_tokens, device=self.device)
-                
+
                 if n_timesteps is None:
                     n_timesteps = continuous_action_tokens.shape[0]
                 else:
@@ -318,31 +317,31 @@ class GatoPolicy(nn.Module):
                 else:
                     assert n_timesteps == discrete_action_tokens.shape[0], "number of timesteps must be the same for all modalities"
 
-            
+
 
             separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim, device=self.device) * self.separator_token
             separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
             separator_targets = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
-            
+
             # interleave observation, action tokens,add separator
 
             # interleave tokens
             batch_tokens = torch.cat(
                 [
                     tokens for tokens in
-                    [text_tokens, image_tokens, continuous_tokens, discrete_tokens, separator_tokens, continuous_action_tokens, discrete_action_tokens] 
+                    [text_tokens, image_tokens, continuous_tokens, discrete_tokens, separator_tokens, continuous_action_tokens, discrete_action_tokens]
                     if tokens is not None
-                ], 
+                ],
                 dim=1,
-            ) 
+            )
 
             # interleave targets
             batch_target_masks = torch.cat(
                 [
-                    targets for targets in 
-                    [text_targets, image_targets, continuous_targets, discrete_targets, separator_targets, continuous_action_targets, discrete_action_targets] 
+                    targets for targets in
+                    [text_targets, image_targets, continuous_targets, discrete_targets, separator_targets, continuous_action_targets, discrete_action_targets]
                     if targets is not None
-                ], 
+                ],
                 dim=1
             )
             # interleave embeddings, n_timesteps x n_tokens x embed_dim
@@ -351,7 +350,7 @@ class GatoPolicy(nn.Module):
                     embeddings for embeddings in
                     [text_embeddings, image_embeddings, continuous_embeddings, discrete_embeddings]
                     if embeddings is not None
-                ], 
+                ],
                 dim=1
             ) # concat observations
 
@@ -383,7 +382,7 @@ class GatoPolicy(nn.Module):
         for i in range(n_batches):
             # store which tokens are padding and which are real
             token_masks.append(torch.cat([torch.zeros(1, max_tokens -  token_embeddings[i].shape[1], device=self.device), torch.ones(1,  token_embeddings[i].shape[1], device=self.device)], dim=1))
-            
+
             token_embeddings[i] = torch.cat([torch.zeros(1, max_tokens - token_embeddings[i].shape[1], self.embed_dim, device=self.device), token_embeddings[i]], dim=1)
             tokens[i] = torch.cat([torch.zeros(1, max_tokens - tokens[i].shape[1], dtype=torch.long, device=self.device), tokens[i]], dim=1)
             token_target_masks[i] = torch.cat([torch.zeros(1, max_tokens - token_target_masks[i].shape[1], device=self.device), token_target_masks[i]], dim=1)
@@ -394,12 +393,12 @@ class GatoPolicy(nn.Module):
         token_target_masks = torch.cat(token_target_masks, dim=0)
         token_masks = torch.cat(token_masks, dim=0)
         return token_embeddings, tokens, token_target_masks, token_masks
-    
+
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
     def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
         # expects that inputs['continuous_actions'] or inputs['discrete_actions'] are padded by 1 timestep
-        
+
         action_type = task.action_type # continuous or discrete
         action_tokens = task.action_tokens
 
@@ -408,7 +407,7 @@ class GatoPolicy(nn.Module):
             assert action_tokens == 1, "only support 1 discrete action token"
         elif action_type == gym.spaces.Box:
             action_str = 'continuous'
-        
+
         start_token = self.token_starts[action_str]
         end_token = self.token_ends[action_str]
 
@@ -422,7 +421,7 @@ class GatoPolicy(nn.Module):
 
         token_embeddings = token_embeddings[:, :-action_tokens, :]
         token_masks = token_masks[:, :-action_tokens]
-        
+
         predicted_tokens = []
 
         # predict tokens, sampling or deterministically picking best token
@@ -459,7 +458,7 @@ class GatoPolicy(nn.Module):
 if __name__ == '__main__':
     model = GatoPolicy(
         device='cpu',
-        embed_dim=128,
+        embed_dim=768,  # GPT2 embedding size
         layers=2,
         heads=4,
 
@@ -477,7 +476,7 @@ if __name__ == '__main__':
     }]
 
     #output = model(inputs)
-    
+
     # Mix of image+discrete and continuous+continuous, and compute loss
     output = model([
         {
