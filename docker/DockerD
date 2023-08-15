@@ -61,9 +61,9 @@ RUN curl -sLo ~/miniconda.sh https://repo.continuum.io/miniconda/Miniconda3-py39
  && rm /app/environment.yml \
  && conda clean -ya
 
-# Set up Minari
-RUN git clone https://github.com/Farama-Foundation/Minari.git
-RUN cd Minari && pip install -e .
+# Set up Minari (now setup in env.yml)
+# RUN git clone https://github.com/Farama-Foundation/Minari.git
+# RUN cd Minari && pip install -e .
 
 COPY ./gato/data/download_custom_datasets.py ./download_custom_datasets.py
 RUN python download_custom_datasets.py
