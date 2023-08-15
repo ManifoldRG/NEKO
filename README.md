@@ -16,10 +16,6 @@ and can be downloaded by:
 
 
 ```bash
-git clone https://github.com/Farama-Foundation/Minari.git
-cd Minari
-pip install -e .
-
 cd ..
 python ./gato/data/download_custom_datasets.py
 ```
