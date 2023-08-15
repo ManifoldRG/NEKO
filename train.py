@@ -7,6 +7,8 @@ import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
+from accelerate import DistributedDataParallelKwargs
+
 import transformers
 
 from gato.utils.utils import DotDict
@@ -18,7 +20,8 @@ from gato.tasks.control_task import ControlTask
 
 
 def main(args):
-    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps)
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
     device = accelerator.device
     args.device = accelerator.device
 
@@ -58,9 +61,11 @@ def main(args):
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
-        flash=args.flash
+        flash=args.flash,
+        pad_seq=args.pad_seq,
     )
     args.embed_dim = model.embed_dim
+    model = accelerator.prepare(model)
     
     if args.lora:
         assert args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
@@ -92,7 +97,8 @@ def main(args):
     scheduler = get_linear_warmup_cosine_decay_scheduler(optimizer, args.warmup_steps, args.training_steps, base_lr=args.learning_rate, init_lr=args.init_lr, min_lr=args.learning_rate / args.min_factor, cosine_decay=not args.disable_cosine_decay)
 
     # setup up Accelerate, without dataloader:
-    model, optimizer, scheduler = accelerator.prepare(model, optimizer, scheduler)
+    #model, optimizer, scheduler = accelerator.prepare(model, optimizer, scheduler)
+    optimizer, scheduler = accelerator.prepare(optimizer, scheduler)
 
     if args.use_wandb:
         wandb.init(
@@ -188,6 +194,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--training_steps', type=int, default=1_000_000)
     parser.add_argument('--log_eval_freq', type=int, default=100_000)
+
+    parser.add_argument('--pad_seq', action='store_true', default=False) # pad sequences to max length
 
 
     # evaluation

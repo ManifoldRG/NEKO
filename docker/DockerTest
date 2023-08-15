@@ -1,0 +1,58 @@
+FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
+
+# Install some basic utilities
+RUN apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    curl \
+    ca-certificates \
+    sudo \
+    git \
+    libx11-6 \
+    libgl1-mesa-dev \
+    libgl1-mesa-glx \
+    libglew-dev \
+    libosmesa6-dev \
+    software-properties-common \
+    net-tools \
+    gcc \
+    vim \
+    wget \
+    xpra \
+    xserver-xorg-dev \
+    tmux \
+    xvfb unzip patchelf ffmpeg cmake swig g++ \
+    && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# Create a working directory
+RUN mkdir /app
+WORKDIR /app
+
+# MuJoCo
+RUN sudo mkdir -p /root/.mujoco \
+    && sudo wget https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz -O mujoco.tar.gz \
+    && sudo tar -xf mujoco.tar.gz -C /root/.mujoco \
+    && sudo rm mujoco.tar.gz
+
+ENV LD_LIBRARY_PATH /root/.mujoco/mujoco210/bin:${LD_LIBRARY_PATH}
+
+RUN git clone https://github.com/ManifoldRG/gato-control.git
+
+# Set up the Conda environment
+ENV CONDA_AUTO_UPDATE_CONDA=false \
+    PATH=/root/miniconda/bin:$PATH
+    #PATH=$HOME/miniconda/bin:$PATH
+RUN cp ./gato-control/env.yml ./environment.yml
+RUN curl -sLo ~/miniconda.sh https://repo.continuum.io/miniconda/Miniconda3-py39_4.10.3-Linux-x86_64.sh \
+ && chmod +x ~/miniconda.sh \
+ && ~/miniconda.sh -b -p ~/miniconda \
+ && rm ~/miniconda.sh
+
+RUN conda env update -n base -f ./environment.yml \
+ && rm ./environment.yml \
+ && conda clean -ya
+
+# Set up Minari
+RUN git clone https://github.com/Farama-Foundation/Minari.git
+RUN cd Minari && pip install -e . && cd ..
+
+RUN cd gato-control && python ./gato/data/download_custom_datasets.py
