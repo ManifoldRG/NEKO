@@ -127,6 +127,7 @@ class ControlTask(Task):
 
             if promptless_eval:
                 past_key_values = None
+                input_dict = None
 
 
             done = False
@@ -154,7 +155,6 @@ class ControlTask(Task):
                 # only need last two
                 input_dict[self.obs_str] = input_dict[self.obs_str][-2:,]
                 input_dict[self.action_str] = input_dict[self.action_str][-2:,]
-
 
                 # trim to context length
                 action, past_key_values = model.predict_control(
