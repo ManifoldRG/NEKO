@@ -7,7 +7,7 @@ import gymnasium as gym
 import transformers
 
 # import gato
-from gato.transformers import HFGPT, GPT2Model
+from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 from gato.tasks.control_task import ControlTask
