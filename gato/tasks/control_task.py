@@ -110,7 +110,6 @@ class ControlTask(Task):
         metrics = {}
 
         context_timesteps = model.context_len // self.tokens_per_timestep # amount of timesteps that fit into context
-
         for i in range(n_iterations):
             observation, info = self.env.reset()
 
@@ -121,6 +120,7 @@ class ControlTask(Task):
 
             # do forward pass to get past_key_values
             _, _, past_key_values = model(inputs=[input_dict], use_cache=True)
+            #import pdb; pdb.set_trace()
 
             # infer dtypes
             action_type = input_dict[self.action_str].dtype
@@ -137,20 +137,24 @@ class ControlTask(Task):
                 if self.image_transform is not None:
                     new_obs = self.image_transform.transform(new_obs)
                 # input dict only contains current timestep, past info is in past_key_values
-                input_dict = {
-                    self.obs_str: new_obs,
-                    self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)
-                }
+                # input_dict = {
+                #     self.obs_str: new_obs,
+                #     self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)
+                # }
 
-                # # append new observation, and pad actions
-                # if input_dict is not None:
-                #     input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
-                #     input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)], dim=0)
-                # else:
-                #     input_dict = {
-                #         self.obs_str: new_obs,
-                #         self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type),
-                #     }
+                # append new observation, and pad actions
+                if input_dict is not None:
+                    input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
+                    input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)], dim=0)
+                else:
+                    input_dict = {
+                        self.obs_str: new_obs,
+                        self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type),
+                    }
+                # only need last two
+                input_dict[self.obs_str] = input_dict[self.obs_str][-2:,]
+                input_dict[self.action_str] = input_dict[self.action_str][-2:,]
+
 
                 # trim to context length
                 action, past_key_values = model.predict_control(
@@ -159,7 +163,7 @@ class ControlTask(Task):
                     past_key_values=past_key_values, 
                     use_cache=True
                 )
-                
+                input_dict[self.action_str][-1,] = action
                 np_action = action.cpu().numpy()
                 observation, reward, terminated, truncated, info = self.env.step(np_action)
                 done = terminated or truncated

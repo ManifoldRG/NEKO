@@ -454,11 +454,19 @@ class GatoPolicy(nn.Module):
         
         # truncate past_key_values to context len
         if past_key_values is not None: 
+            # and trim off fisrst obs + padding tokens
+            trim_tokens = task.tokens_per_timestep - action_tokens
+            token_embeddings = token_embeddings[:, trim_tokens:, :]
+            token_masks = token_masks[:, trim_tokens:]
+
             #print(past_key_values[0].shape)
             diff = (past_key_values[0].shape[-2] + token_embeddings.shape[1]) - self.context_len
-            if diff > 0:
-                for i in range(len(past_key_values)):
-                    past_key_values[i] = past_key_values[i][:, :, :, diff:, :]
+            #if diff > 0:
+
+            past_trim_tokens = task.tokens_per_timestep + action_tokens - 1
+            for i in range(len(past_key_values)):
+                #past_key_values[i] = past_key_values[i][:, :, :, diff:, :]
+                past_key_values[i] = past_key_values[i][:, :, :, past_trim_tokens:, :]
 
         # predict tokens, sampling or deterministically picking best token
         #print('hey')
@@ -466,6 +474,7 @@ class GatoPolicy(nn.Module):
             # if past_key_values is not None:
             #     print(past_key_values[0].shape)
             # print(token_embeddings.shape)
+            #import pdb; pdb.set_trace()
             logits, _, past_key_values = self.forward(
                 token_embeddings=token_embeddings, 
                 token_masks=token_masks, 
@@ -495,13 +504,12 @@ class GatoPolicy(nn.Module):
 
             # trim off last token from past_key_values
             if past_key_values is not None and i != action_tokens - 1: 
-                for i in range(len(past_key_values)):
-                    past_key_values[i] = past_key_values[i][:, :, :, 1:, :]
+                # for i in range(len(past_key_values)):
+                #     past_key_values[i] = past_key_values[i][:, :, :, 1:, :]
                 # only need the new
                 token_embeddings = token_embeddings[:, -1:, :]
                 token_masks = token_masks[:, -1:]
-
-
+        print(past_key_values[0].shape)
 
         # convert tokens back to actions
         if action_type == gym.spaces.Discrete:
