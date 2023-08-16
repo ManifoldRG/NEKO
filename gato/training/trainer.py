@@ -113,7 +113,7 @@ class Trainer:
 
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
-            logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
+            logits, loss, _ = self.model.forward(inputs = batch_dicts, compute_loss=True)
             self.accelerator.backward(loss)
 
             if not self.args.disable_grad_clip and self.accelerator.sync_gradients:

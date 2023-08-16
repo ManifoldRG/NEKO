@@ -151,7 +151,7 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs: list = None, compute_loss=False, **kwargs):
+    def forward(self, inputs: list = None, compute_loss=False, use_cache=False, past_key_values=None, **kwargs):
         # tokenize inputs
         if inputs is not None:
             token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
@@ -164,7 +164,22 @@ class GatoPolicy(nn.Module):
 
         # pass to transformer
         #final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
-        final_representations = self.transformer(inputs_embeds=token_embeddings, attention_mask=token_masks)['last_hidden_state']
+        if past_key_values is not None:
+            # extend attention mask to account for number of past key values
+            token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], past_key_values[0].shape[-2]).to(token_masks.device)], dim=1)
+        
+        transformer_output = self.transformer(
+            inputs_embeds=token_embeddings, 
+            attention_mask=token_masks, 
+            past_key_values=past_key_values,
+            use_cache=use_cache
+        )
+
+        final_representations = transformer_output['last_hidden_state']
+        if use_cache:
+            past_key_values = list(transformer_output['past_key_values'])
+        else:
+            past_key_values = None
 
         # predict logits
         logits = self.predict_token(final_representations)
@@ -187,7 +202,7 @@ class GatoPolicy(nn.Module):
         else:
             loss = None
         
-        return logits, loss
+        return logits, loss, past_key_values
 
 
     def tokenize_input_dicts(self, inputs: list):
@@ -409,7 +424,7 @@ class GatoPolicy(nn.Module):
     
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
-    def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
+    def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True, past_key_values=None, use_cache=False, **kwargs):
         # expects that inputs['continuous_actions'] or inputs['discrete_actions'] are padded by 1 timestep
         
         action_type = task.action_type # continuous or discrete
@@ -436,10 +451,29 @@ class GatoPolicy(nn.Module):
         token_masks = token_masks[:, :-action_tokens]
         
         predicted_tokens = []
+        
+        # truncate past_key_values to context len
+        if past_key_values is not None: 
+            #print(past_key_values[0].shape)
+            diff = (past_key_values[0].shape[-2] + token_embeddings.shape[1]) - self.context_len
+            if diff > 0:
+                for i in range(len(past_key_values)):
+                    past_key_values[i] = past_key_values[i][:, :, :, diff:, :]
 
         # predict tokens, sampling or deterministically picking best token
+        #print('hey')
         for i in range(action_tokens):
-            logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+            # if past_key_values is not None:
+            #     print(past_key_values[0].shape)
+            # print(token_embeddings.shape)
+            logits, _, past_key_values = self.forward(
+                token_embeddings=token_embeddings, 
+                token_masks=token_masks, 
+                token_target_masks=None, 
+                tokens=None,
+                past_key_values=past_key_values,
+                use_cache=use_cache,
+            )
             # extract valid logits from last timestep
             logits = logits[0, -1, start_token:(end_token+1)]
             if deterministic:
@@ -459,6 +493,16 @@ class GatoPolicy(nn.Module):
             token_masks = token_masks[:, -self.context_len:]
             predicted_tokens.append(token)
 
+            # trim off last token from past_key_values
+            if past_key_values is not None and i != action_tokens - 1: 
+                for i in range(len(past_key_values)):
+                    past_key_values[i] = past_key_values[i][:, :, :, 1:, :]
+                # only need the new
+                token_embeddings = token_embeddings[:, -1:, :]
+                token_masks = token_masks[:, -1:]
+
+
+
         # convert tokens back to actions
         if action_type == gym.spaces.Discrete:
             action = predicted_tokens[0] - start_token
@@ -466,7 +510,7 @@ class GatoPolicy(nn.Module):
             predicted_tokens = torch.stack(predicted_tokens, dim=0)
             action = self.continuous_action_tokenizer.decode(predicted_tokens)
 
-        return action
+        return action, past_key_values
 
 if __name__ == '__main__':
     model = GatoPolicy(

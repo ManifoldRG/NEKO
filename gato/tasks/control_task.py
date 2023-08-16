@@ -30,13 +30,20 @@ class ControlTask(Task):
             args,
             training_prompt_len_proportion=0.5, 
             share_prompt_episodes=True,
-            top_k_prompting=None
+            top_k_prompting=None,
+            cached_eval=False
         ):
         super().__init__()
         self.name = env_name
         self.env = env
         self.dataset = dataset
         self.args = args
+        self.cached_eval = cached_eval
+
+        if self.cached_eval:
+            self.evaluate = self.cached_evaluate
+        else:
+            self.evaluate = self.orig_evaluate
 
         self.action_type = type(self.env.action_space)
         self.observation_type = type(self.env.observation_space)
@@ -96,8 +103,76 @@ class ControlTask(Task):
         else:
             self.top_ids = None
 
-    
-    def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
+    def cached_evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
+        # serial evaluation
+        returns = []
+        ep_lens = []
+        metrics = {}
+
+        context_timesteps = model.context_len // self.tokens_per_timestep # amount of timesteps that fit into context
+
+        for i in range(n_iterations):
+            observation, info = self.env.reset()
+
+            # sample prompt
+            input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True,ep_ids=self.top_ids)[0]
+            # input_dict[self.obs_str] = input_dict[self.obs_str][-(context_timesteps-1):,]
+            # input_dict[self.action_str] = input_dict[self.action_str][-(context_timesteps-1):,]
+
+            # do forward pass to get past_key_values
+            _, _, past_key_values = model(inputs=[input_dict], use_cache=True)
+
+            # infer dtypes
+            action_type = input_dict[self.action_str].dtype
+
+            if promptless_eval:
+                past_key_values = None
+
+
+            done = False
+            ep_return = 0
+            ep_len = 0
+            while not done:
+                new_obs = torch.tensor(observation, device=model.device).unsqueeze(0)
+                if self.image_transform is not None:
+                    new_obs = self.image_transform.transform(new_obs)
+                # input dict only contains current timestep, past info is in past_key_values
+                input_dict = {
+                    self.obs_str: new_obs,
+                    self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)
+                }
+
+                # # append new observation, and pad actions
+                # if input_dict is not None:
+                #     input_dict[self.obs_str] = torch.cat([input_dict[self.obs_str], new_obs], dim=0)
+                #     input_dict[self.action_str] = torch.cat([input_dict[self.action_str], torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type)], dim=0)
+                # else:
+                #     input_dict = {
+                #         self.obs_str: new_obs,
+                #         self.action_str: torch.zeros(1, self.action_tokens, device=model.device, dtype=action_type),
+                #     }
+
+                # trim to context length
+                action, past_key_values = model.predict_control(
+                    input_dict, task=self, 
+                    deterministic=deterministic, 
+                    past_key_values=past_key_values, 
+                    use_cache=True
+                )
+                
+                np_action = action.cpu().numpy()
+                observation, reward, terminated, truncated, info = self.env.step(np_action)
+                done = terminated or truncated
+                ep_return += reward 
+                ep_len += 1
+            returns.append(ep_return)
+            ep_lens.append(ep_len)
+
+        metrics['mean_return'] = np.mean(returns)
+        metrics['mean_episode_len'] = np.mean(ep_lens)
+        return metrics
+
+    def orig_evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []
         ep_lens = []
@@ -137,7 +212,7 @@ class ControlTask(Task):
                 # trim to context length
                 input_dict[self.obs_str] = input_dict[self.obs_str][-context_timesteps:,]
                 input_dict[self.action_str] = input_dict[self.action_str][-context_timesteps:,]
-                action = model.predict_control(input_dict, task=self, deterministic=deterministic)
+                action, _ = model.predict_control(input_dict, task=self, deterministic=deterministic)
                 input_dict[self.action_str][-1,] = action
                 np_action = action.cpu().numpy()
                 observation, reward, terminated, truncated, info = self.env.step(np_action)
