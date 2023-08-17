@@ -62,7 +62,8 @@ def main(args):
         use_pos_encoding=not args.disable_inner_pos_encoding,
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
-        flash=args.flash
+        flash=args.flash,
+        tokenizer_model_name=args.tokenizer_model_name
     )
     args.embed_dim = model.embed_dim
 
@@ -155,6 +156,7 @@ if __name__ == '__main__':
     parser.add_argument('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
 
     # transformer architecture hyperparameters
+    parser.add_argument('--tokenizer_model_name', type=str, default='gpt2')
     parser.add_argument('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
     parser.add_argument('--flash', default=False, action='store_true') # enable flash attention
     parser.add_argument('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
@@ -172,6 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--lora_dropout', type=float, default=0.1)
 
     # training hyperparameters
+    parser.add_argument('--text_prop', type=float, default=0.5) # proportion of text data in batch
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)

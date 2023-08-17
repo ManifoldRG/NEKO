@@ -1,32 +1,10 @@
 import torch
 import torch.nn as nn
 import math
-from transformers import BertTokenizer, GPT2Tokenizer
 
 def mu_law(tensor, mu=100, M=256):
     return torch.sign(tensor) * torch.log(1 + mu * torch.abs(tensor)) / math.log(1 + mu*M) #torch.log(1 + mu*M)
 
-
-class TextTokenizerGPT2:
-    def __init__(self, pretrained_model_name='gpt2'):
-        self.tokenizer = GPT2Tokenizer.from_pretrained(pretrained_model_name)
-
-    def encode(self, text_sequences):
-        return self.tokenizer(text_sequences, truncation=True, padding='longest', return_tensors='pt')
-
-    def decode(self, tokens):
-        return self.tokenizer.decode(tokens)
-
-class TextTokenizer:
-    def __init__(self):
-        # for now using Bert here, but we can switch to a different tokenizer
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-
-    def encode(self, text):
-        return self.tokenizer.encode(text)
-
-    def decode(self, tokens):
-        return self.tokenizer.decode(tokens)
 
 class ContinuousTokenizer:
     def __init__(self, use_mu_law=True, mu=100, M=256, n_bins=1024, offset=None):
