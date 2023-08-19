@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from gato.utils.utils import save_model
+from gato.tasks.task import TaskTypeEnum
 
 class Trainer:
     def __init__(
@@ -15,7 +16,6 @@ class Trainer:
         accelerator,
         scheduler,
         tasks,
-        text_dataset,
         exp_name,
         args
     ):
@@ -33,7 +33,6 @@ class Trainer:
 
         self.exp_name = exp_name
         self.exp_dir = os.path.join(self.args.save_dir, self.exp_name)
-        self.text_dataset = text_dataset
 
         self.steps = 0
         self.start_time = None
@@ -82,7 +81,7 @@ class Trainer:
                 eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/{task.name}/{k}'] = v
-            # todo : add text eval as well.
+            # TODO : add text eval as well.
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
@@ -135,29 +134,18 @@ class Trainer:
         return loss.detach().cpu().item(), logs
 
     def sample_text_batch(self, batch_size):
-        # Select batch_size number of random indices from the size of the text dataset.
-        random_indices = np.random.randint(0, len(self.text_dataset['train']), size=batch_size)
-        selected_text_examples = [self.text_dataset['train'][idx]['text'] for idx in random_indices]
-        
         batch_dicts = []
-        for text in selected_text_examples:
-            batch_dict = {
-                'text': text,
-                'images': None,
-                'continuous_obs': None,
-                'discrete_obs': None,
-                'continuous_actions': None,
-                'discrete_actions': None
-            }
-            batch_dicts.append(batch_dict)
-
+        text_tasks = [t for t in self.tasks if t.type == TaskTypeEnum.TEXT]
+        for i,task in enumerate (text_tasks):
+            batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
 
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
         sampled_task_indices = []
-        n_tasks = len(self.tasks)
+        control_tasks = [t for t in self.tasks if t.type == TaskTypeEnum.CONTROL]
+        n_tasks = len(control_tasks)
         while len(sampled_task_indices) < batch_size:
             max_n = min(n_tasks, batch_size - len(sampled_task_indices))
             new_tasks = np.random.choice(np.arange(n_tasks), size=max_n, replace=False).tolist()
@@ -173,7 +161,7 @@ class Trainer:
 
 
         # aggregate acrosss tasks sampled multiple times
-        for i, task in enumerate(self.tasks):
+        for i, task in enumerate(control_tasks):
             total_task_batch_size = 0
             task_vanilla_batch_size = 0
             task_prompted_batch_sizes = {}

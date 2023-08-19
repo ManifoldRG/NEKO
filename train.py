@@ -15,7 +15,8 @@ from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
-from datasets import load_dataset
+from gato.tasks.text_task import TextTask
+from gato.tasks.task import TaskTypeEnum
 
 
 def main(args):
@@ -24,16 +25,14 @@ def main(args):
     args.device = accelerator.device
 
     exp_id = random.randint(int(1e5), int(1e6) - 1)
-    exp_name = f'gato-control-{exp_id}'
-
-    envs, datasets = load_envs(args.datasets) # Load Minari datasets and corresponding Gym environments
-
-    # load the text dataset
-    text_dataset = load_dataset('wikitext', 'wikitext-103-raw-v1')
+    exp_name = f'neko-gato-{exp_id}'
 
     tasks = []
-    for env, dataset in zip(envs, datasets):
+    # add control datasets and env
+    envs, control_datasets = load_envs(args.control_datasets) # Load Minari datasets and corresponding Gym environments
+    for env, dataset in zip(envs, control_datasets):
         task = ControlTask(
+            TaskTypeEnum.CONTROL,
             env.unwrapped.spec.id,
             env,
             dataset,
@@ -44,6 +43,9 @@ def main(args):
             top_k_prompting = args.top_k
         )
         tasks.append(task)
+    
+    # add text datasets
+    tasks.append(TextTask(TaskTypeEnum.TEXT, args.text_datasets))
 
     model = GatoPolicy(
         device=args.device,
@@ -116,7 +118,6 @@ def main(args):
         scheduler = scheduler,
         accelerator = accelerator,
         tasks = tasks,
-        text_dataset = text_dataset,
         exp_name = exp_name,
         args=args
     )
@@ -204,7 +205,8 @@ if __name__ == '__main__':
     parser.add_argument('--promptless_eval', action='store_true', default=False)
 
     # datasets / envs
-    parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
+    parser.add_argument('--control_datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-103-raw-v1'])
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
