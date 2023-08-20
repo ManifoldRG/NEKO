@@ -79,11 +79,15 @@ class Trainer:
         with torch.no_grad():
             for task in self.tasks:
                 eval_logs = {}
-                if self.args.eval_episodes > 0 :
-                    eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
-                for k, v in eval_logs.items():
-                    logs[f'evaluation/{task.name}/{k}'] = v
-            # TODO : add text eval as well.
+                if task.task_type == TaskTypeEnum.CONTROL:
+                    if self.args.eval_episodes > 0 :
+                        eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
+                    for k, v in eval_logs.items():
+                        logs[f'evaluation/{task.name}/{k}'] = v
+                elif task.task_type == TaskTypeEnum.TEXT:
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic)
+                    for k, v in eval_logs.items():
+                        logs[f'evaluation/text/{k}'] = v
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start

@@ -211,6 +211,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_episodes', type=int, default=10)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=False)
+    parser.add_argument('--eval_text_num_examples', type=int, default=100)
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
