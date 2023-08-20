@@ -35,7 +35,7 @@ def main(args):
     envs, control_datasets = load_envs(args.control_datasets) # Load Minari datasets and corresponding Gym environments
     for env, dataset in zip(envs, control_datasets):
         task = ControlTask(
-            TaskTypeEnum.CONTROL,
+            TaskTypeEnum.CONTROL.value,
             env.unwrapped.spec.id,
             env,
             dataset,
@@ -48,7 +48,7 @@ def main(args):
         tasks.append(task)
     
     # add text datasets
-    tasks.append(TextTask(TaskTypeEnum.TEXT, args.text_datasets))
+    tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
 
     model = GatoPolicy(
         device=args.device,
@@ -214,8 +214,8 @@ if __name__ == '__main__':
     parser.add_argument('--eval_text_num_examples', type=int, default=100)
 
     # datasets / envs
-    parser.add_argument('--control_datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
-    parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-103-raw-v1'])
+    parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-2-v1'])
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted

@@ -50,13 +50,11 @@ class GatoPolicy(nn.Module):
 
         self.context_len = context_len
         self.pad_seq = pad_seq
-        # this is a dummy value as this implementation does not yet handle language IO
-        #self.text_tokens = 32000 # SentencePiece vocab size
-        self.text_tokens = 1
+        self.text_tokens = 50257 # gpt2
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
-
+        
         # order of text, continuous, discrete
         self.token_starts = {
             'text': 0,
@@ -257,7 +255,9 @@ class GatoPolicy(nn.Module):
 
             # tokenize text
             if 'text' in batch and batch['text'] is not None:
-                text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, padding='longest', return_tensors='pt')
+                text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
+                text_tokens = text_tokens.long()
+                print(f'text_tokens : {text_tokens}')
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets_masks = torch.ones_like(text_tokens)
                 n_timesteps = text_tokens.shape[0]
