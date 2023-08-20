@@ -4,6 +4,7 @@ from gato.tasks.task import Task, TaskTypeEnum
 import numpy as np
 import math
 from torch.nn import functional as F
+from typing import List
 
 class TextTask(Task): 
        

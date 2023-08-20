@@ -23,7 +23,7 @@ def tokens_per_space(space):
 class ControlTask(Task):
     def __init__(
             self,
-            task_type, 
+            task_type: TaskTypeEnum,
             env_name: str, 
             env: gym.Env, 
             dataset: minari.MinariDataset, 
