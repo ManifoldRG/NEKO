@@ -78,7 +78,9 @@ class Trainer:
         # loop over eval for each env
         with torch.no_grad():
             for task in self.tasks:
-                eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
+                eval_logs = {}
+                if self.args.eval_episodes > 0 :
+                    eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/{task.name}/{k}'] = v
             # TODO : add text eval as well.

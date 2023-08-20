@@ -8,7 +8,7 @@ import transformers
 from transformers import AutoTokenizer
 
 # import gato
-from gato.transformers import HFGPT, GPT2Model
+from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 from gato.tasks.control_task import ControlTask
@@ -42,12 +42,14 @@ class GatoPolicy(nn.Module):
         pretrained_lm: str = None, # Optional, name of pretrained language model to use
         flash: bool = False, # TODO verify correctness
         tokenizer_model_name: str = 'gpt2',
+        pad_seq: bool = False
     ):
         super().__init__()
 
         self.device = device
 
         self.context_len = context_len
+        self.pad_seq = pad_seq
         # this is a dummy value as this implementation does not yet handle language IO
         #self.text_tokens = 32000 # SentencePiece vocab size
         self.text_tokens = 1
@@ -394,6 +396,16 @@ class GatoPolicy(nn.Module):
         tokens = torch.cat(tokens, dim=0)
         token_target_masks = torch.cat(token_target_masks, dim=0)
         token_masks = torch.cat(token_masks, dim=0)
+
+        if self.pad_seq:
+            # get seq length
+            seq_len = token_embeddings.shape[1]
+            pad_len = self.context_len - seq_len
+            if pad_len > 0:
+                token_embeddings = torch.cat([token_embeddings, torch.zeros(n_batches, pad_len, self.embed_dim, device=self.device)], dim=1)
+                tokens = torch.cat([tokens, torch.zeros(n_batches, pad_len, dtype=torch.long, device=self.device)], dim=1)
+                token_target_masks = torch.cat([token_target_masks, torch.zeros(n_batches, pad_len, device=self.device)], dim=1)
+                token_masks = torch.cat([token_masks, torch.zeros(n_batches, pad_len, device=self.device)], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
 
 

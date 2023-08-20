@@ -1,4 +1,4 @@
-We are aiming to provide  working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation for control tasks to be used for [Manifold's Neko](https://github.com/ManifoldRG) or other projects. This implementation is currently in progress.
+We are aiming to provide a working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation, currently focused on control tasks. This is part of [Manifold's Neko](https://github.com/ManifoldRG) or can be used for other projects. This implementation is currently in progress.
 
 If you use this project, we'd love for you to refer back to Manifold in your code!
 
@@ -16,10 +16,6 @@ and can be downloaded by:
 
 
 ```bash
-git clone https://github.com/Farama-Foundation/Minari.git
-cd Minari
-pip install -e .
-
 cd ..
 python ./gato/data/download_custom_datasets.py
 ```
@@ -90,8 +86,12 @@ logits, loss = model([
 
 ```
 
+# Pretrained models
+
+We provide some pretrained models, which are not geared for high-performance or reliable external use, but to aid in our open-source development. These can be found for [3 MuJoCo tasks](https://drive.google.com/drive/folders/1hws2ip5SKU6KLOVfRU_N8GNPTHPkxVLP?usp=sharing) and [Breakout](https://drive.google.com/drive/folders/1qzUaY6Qh_MmS8o0EqDw3OL55H3Yn6yxe?usp=sharing). Other models may be added [here](https://drive.google.com/drive/folders/1xVo462ZAs54DxsYTsp7NxmCGvrGVBMFj?usp=sharing) where the directory contains checkpoints, arguments, and link to WandB run in each info.txt.
+
 # Future
-Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/misc/todo.md).  
+Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/misc/todo.md). We are working on adding modular tasks, check out the Issues tab.
 
 # Credits
 
