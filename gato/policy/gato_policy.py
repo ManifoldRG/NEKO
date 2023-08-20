@@ -257,7 +257,6 @@ class GatoPolicy(nn.Module):
             if 'text' in batch and batch['text'] is not None:
                 text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
                 text_tokens = text_tokens.long()
-                print(f'text_tokens : {text_tokens}')
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets_masks = torch.ones_like(text_tokens)
                 n_timesteps = text_tokens.shape[0]
@@ -365,7 +364,12 @@ class GatoPolicy(nn.Module):
                 inner_timestep_embeddings = inner_timestep_embeddings.repeat(n_timesteps, 1, 1)
                 batch_embeddings = batch_embeddings + inner_timestep_embeddings
 
-            action_embeddings = torch.cat([action_embedding for action_embedding in [continuous_action_embeddings, discrete_action_embeddings] if action_embedding is not None], dim=1) # concat action
+            action_embeddings = [action_embedding for action_embedding in [continuous_action_embeddings, discrete_action_embeddings] if action_embedding is not None]
+            if len(action_embeddings) > 0:
+                action_embeddings = torch.cat(action_embeddings, dim=1)
+            else:
+                # Create empty action embeddings
+                action_embeddings = torch.zeros(batch_embeddings.shape[0], 0, self.embed_dim) 
             batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
             tokens_per_timestep = batch_embeddings.shape[1] # number of tokens per timestep
             total_tokens = n_timesteps * tokens_per_timestep
@@ -438,7 +442,7 @@ class GatoPolicy(nn.Module):
                 next_token = torch.multinomial(probs, num_samples=1)[0]
             
             # Check for EOS token
-            if next_token == self.text_tokenizer.eos_token_id:
+            if torch.eq(next_token, self.text_tokenizer.eos_token_id).any():
                 break
             
             # append to token_embeddings and token_masks

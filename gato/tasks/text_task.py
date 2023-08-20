@@ -46,13 +46,13 @@ class TextTask(Task):
         loss = 0
         num_tokens = 0
         
-        if num_examples_to_test > len(self.text_dataset['valid']):
-            print(f'num_examples_to_test chosen is more than valid examples, so setting it to whole valid dataset.')
-            num_examples_to_test = len(self.text_dataset['valid'])
+        if num_examples_to_test > len(self.text_dataset['test']):
+            print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            num_examples_to_test = len(self.text_dataset['test'])
         
         for idx in range(num_examples_to_test):
-            text = self.text_dataset['valid'][idx]['text']
-            target_text = self.text_dataset['valid'][idx]['text']
+            text = self.text_dataset['test'][idx]['text']
+            target_text = self.text_dataset['test'][idx]['text']
             
             output_ids = model.predict_text(text, max_length=100, deterministic=deterministic)
             output_text = self.text_tokenizer.decode(output_ids)
