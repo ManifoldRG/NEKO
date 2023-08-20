@@ -432,7 +432,7 @@ class GatoPolicy(nn.Module):
         
             # Forward pass
             logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
-            next_token_logits = logits[:, -1, :]
+            # next_token_logits = logits[:, -1, :]
             
             if deterministic:
                 next_token = torch.argmax(logits, dim=-1)
@@ -448,6 +448,7 @@ class GatoPolicy(nn.Module):
             # append to token_embeddings and token_masks
             token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
             new_embedding = self.embed_token(next_token) # check shape of new_emebddingss
+            new_embedding = new_embedding[:, -1, :]
             token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
             
             # and trim to context len
