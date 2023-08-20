@@ -1,4 +1,4 @@
-We are aiming to provide a working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation, currently focused on control tasks. This is part of [Manifold's Neko](https://github.com/ManifoldRG) or can be used for other projects. This implementation is currently in progress.
+We are aiming to provide a working and trainable [Gato](https://arxiv.org/abs/2205.06175) implementation, currently focused on control and text tasks. This is part of [Manifold's Neko](https://github.com/ManifoldRG) or can be used for other projects. This implementation is currently in progress.
 
 If you use this project, we'd love for you to refer back to Manifold in your code!
 
