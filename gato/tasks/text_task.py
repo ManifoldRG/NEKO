@@ -12,7 +12,7 @@ class TextTask(Task):
         super().__init__(task_type)
         text_datasets_list = []
         for text_dataset in dataset_names:
-            text_datasets_list.append(load_dataset(text_dataset))
+            text_datasets_list.append(load_dataset(path='wikitext', name=text_dataset))
         if len(text_datasets_list) == 1:
             self.text_dataset = text_datasets_list[0]
         else:            
@@ -22,6 +22,7 @@ class TextTask(Task):
         
     def sample_batch(self, batch_size):
         random_indices = np.random.randint(0, len(self.text_dataset['train']), size=batch_size)
+        random_indices = [i.item() for i in random_indices]
         # may need more customisation as we switch up more datasets
         selected_text_examples = [self.text_dataset['train'][idx]['text'] for idx in random_indices]
         
