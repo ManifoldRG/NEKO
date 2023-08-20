@@ -42,7 +42,8 @@ def main(args):
     env_args = {
         'render_mode': 'human' if args.render else None,
     }
-    envs, datasets = load_envs(eval_args.datasets, env_args) # Load Minari datasets and corresponding Gym environments
+
+    envs, datasets = load_envs(eval_args.control_datasets, env_args) # Load Minari datasets and corresponding Gym environments
 
     tasks = []
     env_names = []
@@ -130,7 +131,7 @@ if __name__ == '__main__':
     parser.add_argument('--render', action='store_true', default=None)
 
     # datasets / envs
-    parser.add_argument('--datasets', type=str, nargs='+', default=None)
+    parser.add_argument('--control_datasets', type=str, nargs='+', default=None)
 
     args = parser.parse_args()
     args = DotDict(vars(args))

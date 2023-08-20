@@ -2,6 +2,8 @@
 from datasets import load_dataset, concatenate_datasets
 from gato.tasks.task import Task, TaskTypeEnum
 import numpy as np
+import math
+from torch.nn import functional as F
 
 class TextTask(Task): 
        
@@ -37,9 +39,36 @@ class TextTask(Task):
         # current format expected is a list of dict
         return batch_dicts
 
-    def eval(self, model):
-        pass
-
+    def evaluate(self, model, num_examples_to_test=100, deterministic=True):
+        
+        loss = 0
+        num_tokens = 0
+        
+        if num_examples_to_test > len(self.text_dataset['valid']):
+            print(f'num_examples_to_test chosen is more than valid examples, so setting it to whole valid dataset.')
+            num_examples_to_test = len(self.text_dataset['valid'])
+        
+        for idx in range(num_examples_to_test):
+            text = self.text_dataset['valid'][idx]['text']
+            target_text = self.text_dataset['valid'][idx]['text']
+            
+            output_ids = model.predict_text(text, max_length=100, deterministic=deterministic)
+            output_text = self.text_tokenizer.decode(output_ids)
+            print(f'Generated text:{output_text}')
+            
+            target_ids = self.text_tokenizer.encode(target_text)
+            l = F.cross_entropy(output_ids, target_ids)
+            loss += l
+            num_tokens += len(target_ids)
+        
+        avg_loss = loss / num_tokens
+        perplexity = math.exp(avg_loss)
+        
+        metrics = {
+            'loss': avg_loss,
+            'perplexity': perplexity
+        }
+        return metrics
     
 
     

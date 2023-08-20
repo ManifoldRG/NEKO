@@ -397,8 +397,56 @@ class GatoPolicy(nn.Module):
         return token_embeddings, tokens, token_target_masks, token_masks
 
 
+    def predict_text(self, input_text, max_length=20, deterministic=True):
+        """For a single text example, generate prediction (future text)"""
+        
+        batch_dict = {
+            'text': input_text,
+            'images': None,
+            'continuous_obs': None,
+            'discrete_obs': None,
+            'continuous_actions': None,
+            'discrete_actions': None
+        }
+        token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
+        
+        output_ids = input_tokens.clone()
+        
+        for i in range(max_length):
+        
+            # Forward pass
+            logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+            next_token_logits = logits[:, -1, :]
+            
+            if deterministic:
+                next_token = torch.argmax(logits, dim=-1)
+            else:
+                # sample from logits
+                probs = torch.nn.functional.softmax(logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)[0]
+            
+            # Check for EOS token
+            if next_token == self.text_tokenizer.eos_token_id:
+                break
+            
+            # append to token_embeddings and token_masks
+            token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
+            new_embedding = self.embed_token(next_token) # check shape of new_emebddingss
+            token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
+            
+            # and trim to context len
+            token_embeddings = token_embeddings[:, -self.context_len:, :]
+            token_masks = token_masks[:, -self.context_len:]
+            
+            # Append to output
+            output_ids = torch.cat([output_ids, next_token], dim=-1)
+        
+        return output_ids
+
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
     def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
+        """For a single control example, generate prediction (action)"""
+
         # expects that inputs['continuous_actions'] or inputs['discrete_actions'] are padded by 1 timestep
 
         action_type = task.action_type # continuous or discrete
