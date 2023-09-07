@@ -107,10 +107,10 @@ class Trainer:
     def train_step(self):
         logs = {}
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
-        
         # Build training batch
+        start_time = time.time()
         batch_dicts = self.sample_control_batch(self.args.batch_size)
-
+        logs['time/sample_batch'] = time.time() - start_time
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
             logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
@@ -122,7 +122,6 @@ class Trainer:
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
-
         return loss.detach().cpu().item(), logs
 
     def sample_control_batch(self, batch_size):

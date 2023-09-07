@@ -34,6 +34,7 @@ class ControlTask(Task):
         ):
         super().__init__()
         self.name = env_name
+        self.is_atari = 'ALE' in env_name
         self.env = env
         self.dataset = dataset
         self.args = args
@@ -100,6 +101,7 @@ class ControlTask(Task):
     def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []
+        clipped_returns = []
         ep_lens = []
         metrics = {}
 
@@ -119,6 +121,7 @@ class ControlTask(Task):
 
             done = False
             ep_return = 0
+            ep_clipped_return = 0
             ep_len = 0
             while not done:
                 new_obs = torch.tensor(observation, device=model.device).unsqueeze(0)
@@ -143,12 +146,17 @@ class ControlTask(Task):
                 observation, reward, terminated, truncated, info = self.env.step(np_action)
                 done = terminated or truncated
                 ep_return += reward 
+                ep_clipped_return += np.clip(reward, -1.0, 1.0)
                 ep_len += 1
             returns.append(ep_return)
+            clipped_returns.append(ep_clipped_return)
             ep_lens.append(ep_len)
 
         metrics['mean_return'] = np.mean(returns)
         metrics['mean_episode_len'] = np.mean(ep_lens)
+        # Only log clipped return for atari
+        if self.is_atari:
+            metrics['mean_clipped_return'] = np.mean(clipped_returns)
         return metrics
     
     def sample_batch(self, vanilla_batch_size:int , prompted_batch_sizes: dict, device, max_tokens=1024):

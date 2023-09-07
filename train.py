@@ -29,7 +29,6 @@ def main(args):
     exp_name = f'gato-control-{exp_id}'
 
     envs, datasets = load_envs(args.datasets) # Load Minari datasets and corresponding Gym environments
-
     tasks = []
     for env, dataset in zip(envs, datasets):
         task = ControlTask(
