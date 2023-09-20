@@ -196,7 +196,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--pad_seq', action='store_true', default=False) # pad sequences to max length
 
-
     # evaluation
     parser.add_argument('--eval_episodes', type=int, default=10)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
@@ -210,6 +209,7 @@ if __name__ == '__main__':
     parser.add_argument('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
     parser.add_argument('--unique_prompt_episodes', default=False, action='store_true')
     parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
+    parser.add_argument('--parallel_sampling', default=False, action='store_true')
 
     # logging
     parser.add_argument('--use_wandb', '-w', action='store_true', default=False)

@@ -1,8 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
+from itertools import repeat
+import asyncio
+
 import gymnasium as gym
 import numpy as np
 import torch
 import minari
 from minari.dataset.minari_dataset import EpisodeData
+import h5py
 
 from gato.tasks.task import Task
 
@@ -18,7 +24,29 @@ def tokens_per_space(space):
         return 1
     else:
         raise NotImplementedError(f'Unsupported space: {space}')
-    
+
+def _fetch_episode(args):
+    data_path, ep_idx, decode_space, observation_space, action_space = args
+    with h5py.File(data_path, "r") as file:
+        ep_group = file[f"episode_{ep_idx}"]
+        return {
+            "id": ep_group.attrs.get("id"),
+            "total_timesteps": ep_group.attrs.get("total_steps"),
+            "seed": ep_group.attrs.get("seed"),
+            # "observations": ep_group["observations"][()],
+            # "actions": ep_group["actions"][()],
+            "observations": decode_space(
+                ep_group["observations"], observation_space
+            ),
+            "actions": decode_space(
+                ep_group["actions"], action_space
+            ),
+
+            "rewards": ep_group["rewards"][()],
+            "terminations": ep_group["terminations"][()],
+            "truncations": ep_group["truncations"][()],
+        }
+
    
 class ControlTask(Task):
     def __init__(
@@ -192,7 +220,6 @@ class ControlTask(Task):
         )
         
         return episode_dicts
-
     def sample_batch_configurable(
             self, batch_size: int, 
             device: str, 
@@ -323,12 +350,101 @@ class ControlTask(Task):
         indices = self.dataset._generator.choice(
             episode_indices, size=n_episodes, replace=False
         )
+        # if self.args.parallel_sampling:
+        #     # custom parallel
+        #     episodes = self.get_episodes(self.dataset._data, indices)
+        # else:
+        #     # Native minari get_episodes
+        #     episodes = self.dataset._data.get_episodes(indices)
         episodes = self.dataset._data.get_episodes(indices)
         return list(map(lambda data: EpisodeData(**data), episodes))
 
+    def get_episodes(self, _data, episode_indices):
+        """Get a list of episodes.
+
+        Args:
+            _data (MinariData._data): MinariStorage object
+            episode_indices (Iterable[int]): episodes id to return
+
+        Returns:
+            episodes (List[dict]): list of episodes data
+        """
+        #out = []
+        # def fetch_episode(ep_idx):
+        #     with h5py.File(_data._data_path, "r") as file:
+        #         ep_group = file[f"episode_{ep_idx}"]
+        #         return {
+        #             "id": ep_group.attrs.get("id"),
+        #             "total_timesteps": ep_group.attrs.get("total_steps"),
+        #             "seed": ep_group.attrs.get("seed"),
+        #             "observations": _data._decode_space(
+        #                 ep_group["observations"], _data.observation_space
+        #             ),
+        #             "actions": _data._decode_space(
+        #                 ep_group["actions"], _data.action_space
+        #             ),
+        #             "rewards": ep_group["rewards"][()],
+        #             "terminations": ep_group["terminations"][()],
+        #             "truncations": ep_group["truncations"][()],
+        #         }
+        # with ThreadPoolExecutor() as executor:
+        #     out = list(executor.map(fetch_episode, episode_indices))
+        # return out
+        slice_size = 500
+        def read_slice(ep_idx, slice_idx, slice_size):
+            with h5py.File(_data._data_path, 'r') as file:
+                ep_group = file[f"episode_{ep_idx}"] 
+                #TODO, make custom _decode_space instead of slicing directly for other oibs spaces
+                slice_data = ep_group["observations"][slice_idx * slice_size:(slice_idx + 1) * slice_size]
+            return slice_data
+
+
+        out = []
+        with h5py.File(_data._data_path, "r") as file:
+            for ep_idx in episode_indices:
+                ep_group = file[f"episode_{ep_idx}"]
+                out.append(
+                    {
+                        "id": ep_group.attrs.get("id"),
+                        "total_timesteps": ep_group.attrs.get("total_steps"),
+                        "seed": ep_group.attrs.get("seed"),
+                        # "observations": _data._decode_space(
+                        #     egg, _data.observation_space
+                        # ),
+                        "actions": _data._decode_space(
+                            ep_group["actions"], _data.action_space
+                        ),
+                        "rewards": ep_group["rewards"][()],
+                        "terminations": ep_group["terminations"][()],
+                        "truncations": ep_group["truncations"][()],
+                    }
+                )
+                num_slices = (out[-1]['total_timesteps'] + 1 + slice_size - 1) // slice_size
+                with ThreadPoolExecutor() as executor:
+                    data_slices = list(executor.map(read_slice, repeat(ep_idx), range(num_slices), repeat(slice_size)))
+
+                # Now, concatenate data_slices to get the full dataset
+                observations = np.concatenate(data_slices, axis=0)
+                out[-1]['observations'] = observations
+
+        return out
+    # def get_episodes(self, _data, episode_indices):
+    #     """Get a list of episodes."""
+    #     args = [
+    #         (_data._data_path, ep_idx.item(), _data._decode_space, _data.observation_space, _data.action_space)
+    #         for ep_idx in episode_indices
+    #     ]
         
-
-
+    #     with ProcessPoolExecutor() as executor:
+    #         out = list(executor.map(_fetch_episode, args))
+        
+    #     # import pdb; pdb.set_trace()
+    #     # Decoding after multiprocessing pool is complete
+    #     # for i, ep_data in enumerate(out):
+    #     #     ep_data["observations"] = _data._decode_space(ep_data["observations"], _data.observation_space)
+    #     #     ep_data["actions"] = _data._decode_space(ep_data["actions"], _data.action_space)
+        
+    #     return out
 class ControlImageTransform:
     def __init__(self, env, patch_size=16):
         self.env = env
