@@ -126,7 +126,6 @@ class Trainer:
             self.scheduler.step()
             self.optimizer.zero_grad()
         return loss.detach().cpu().item(), logs
-
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
@@ -146,7 +145,8 @@ class Trainer:
         uniform_indices = [i for i in prompt_indices if i not in end_indices]
 
         # aggregate acrosss tasks sampled multiple times
-        if not self.args.parallel_sampling:
+        #if not self.args.parallel_sampling:
+        if True:
             for i, task in enumerate(self.tasks):
                 total_task_batch_size = 0
                 task_vanilla_batch_size = 0
