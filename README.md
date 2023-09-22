@@ -51,7 +51,7 @@ can mix in a single run, e.g:
 --datasets Breakout-top1-s1-v0 hammer-expert-v0
 
 ## Atari Datasets
-All Atari datasets now follow the convention of [Name]-top1-s1-v0, e.g. Breakout-top1-s1-v0. Previously, we old runs may have Breakout-expert_s0-v0 which is depreciated. 
+All Atari datasets now follow the convention of {Name}-top1-s1-v0, e.g. Breakout-top1-s1-v0. Previously, we old runs may have Breakout-expert_s0-v0 which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
 
 You will be able to train on any env in https://github.com/ManifoldRG/gato-control/blob/master/gato/envs/atari.py. To train on all 40 training games, pass --datasets TOP1_ATARI_TRAIN or --datasets TOP1_ATARI_TEST for the 5 testing environmments.
 
