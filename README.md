@@ -53,7 +53,7 @@ can mix in a single run, e.g:
 ## Atari Datasets
 All Atari datasets now follow the convention of [Name]-top1-s1-v0, e.g. Breakout-top1-s1-v0. Previously, we old runs may have Breakout-expert_s0-v0 which is depreciated. 
 
-You will be able to train on any env in https://github.com/ManifoldRG/gato-control/blob/master/gato/envs/atari.py. To train on all 40 testing games, pass --datasets TOP1_ATARI_TRAIN or --datasets TOP1_ATARI_TEST for the 5 testing environmments.
+You will be able to train on any env in https://github.com/ManifoldRG/gato-control/blob/master/gato/envs/atari.py. To train on all 40 training games, pass --datasets TOP1_ATARI_TRAIN or --datasets TOP1_ATARI_TEST for the 5 testing environmments.
 
 Currently, only Breakout is provided here for testing but others will be available shortly. 
 
