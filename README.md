@@ -48,12 +48,12 @@ example run log: https://wandb.ai/daniellawson9999/gato-control/runs/qagorj06/wo
 
 In general, datasets can contain lists of any strings in download_custom_datasets.py or a dataset in https://minari.farama.org/ with Box or Discrete observation or action spaces, although not all default Minari environments have not been tested yet. 
 can mix in a single run, e.g:
---datasets Breakout-top1-s1-v0 hammer-expert-v0
+`--datasets Breakout-top1-s1-v0 hammer-expert-v0`
 
 ## Atari Datasets
-All Atari datasets now follow the convention of {Name}-top1-s1-v0, e.g. Breakout-top1-s1-v0. Previously, we old runs may have Breakout-expert_s0-v0 which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
+All Atari datasets now follow the convention of `{Name}-top1-s1-v0`, e.g. `Breakout-top1-s1-v0`. Previously, we old runs may have `Breakout-expert_s0-v0` which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
 
-You will be able to train on any env in https://github.com/ManifoldRG/gato-control/blob/master/gato/envs/atari.py. To train on all 40 training games, pass --datasets TOP1_ATARI_TRAIN or --datasets TOP1_ATARI_TEST for the 5 testing environmments.
+You will be able to train on any env in https://github.com/ManifoldRG/gato-control/blob/master/gato/envs/atari.py. To train on all 40 training games, pass `--datasets TOP1_ATARI_TRAIN` or `--datasets TOP1_ATARI_TEST` for the 5 testing environmments.
 
 Currently, only Breakout is provided here for testing but others will be available shortly. 
 
