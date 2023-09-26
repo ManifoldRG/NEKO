@@ -2,6 +2,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import minari
+import h5py
 from minari.dataset.minari_dataset import EpisodeData
 
 from gato.tasks.task import Task
@@ -96,7 +97,16 @@ class ControlTask(Task):
             self.top_ids = np.argsort(ep_returns)[-self.top_k_prompting:]
         else:
             self.top_ids = None
-
+        
+        # Calculate length of each episode
+        self.episode_indices = self.dataset._episode_indices
+        self.episode_lengths = []
+        prev_index = -1
+        for i in self.episode_indices:
+            assert i == prev_index + 1, 'Episode indices must be consecutive'
+            with h5py.File(self.dataset.spec.data_path, 'r') as f:
+                self.episode_lengths.append(f[f'episode_{i}']['rewards'].shape[0])
+            prev_index = i
     
     def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
@@ -209,74 +219,49 @@ class ControlTask(Task):
         # Maximum number of timesteps we can fit in context
         num_timesteps = max_tokens // self.tokens_per_timestep
 
-        # List of numpy arrays for each episode 
-        episodes_data = {
-            'actions': [],
-            'observations': [],
-        }
-
-        # Filter dataset if filter function is provided
-        all_episodes = self.sample_episodes(n_episodes=batch_size, episode_indices=ep_ids)
-
-        if share_prompt_episodes:
-            main_episodes = all_episodes
-            prompt_episodes = all_episodes
-        else:
-            main_episodes = all_episodes
-            # prompts come from different episodes
-            prompt_episodes = all_episodes[1:] + all_episodes[:1]
-
-        # If prompt_proportion is nonzero, then each episode has a proportion of its tokens replaced with a prompt 
-
-        # sample "non-prompt" chunk from each episode
+        # sample episode indices
+        episode_indices = np.random.choice(self.dataset._episode_indices, size=batch_size, replace=False)
         timesteps_for_mains = []
         timesteps_for_prompts = []
-        for i, episode in enumerate(main_episodes):
-            timesteps_for_main = round(num_timesteps * (1 - prompt_proportions[i]))
-            timesteps_for_mains.append(timesteps_for_main) # max main size
-            timesteps_for_prompts.append(num_timesteps - timesteps_for_main) # max prompt size
-            ep_len = episode.total_timesteps
-            
-            if timesteps_for_main >= ep_len:
+        for i, episode_index in enumerate(episode_indices):
+            num_timesteps_for_main = int(num_timesteps * (1 - prompt_proportions[i]))
+            ep_len = self.episode_lengths[episode_index]
+            if num_timesteps_for_main >= ep_len:
                 # sample entire episode
                 start = 0
                 end = ep_len - 1
             else:
-                # sample which timestep to start with
-                start = np.random.randint(0, ep_len - timesteps_for_main)
-                end = start + timesteps_for_main
-            observations = episode.observations[start:end,]
-            actions = episode.actions[start:end,]
+                # sample which timestep to start with, may want to change
+                start = np.random.randint(0, ep_len - num_timesteps_for_main)
+                end = start + num_timesteps_for_main - 1
+            timesteps_for_mains.append((start, end))
 
-            episodes_data['observations'].append(observations)
-            episodes_data['actions'].append(actions)
-
-        # add prompt
-        for i, episode in enumerate(prompt_episodes):
-            ep_len = episode.total_timesteps
-            timesteps_for_prompt = timesteps_for_prompts[i]
+            num_timesteps_for_prompt = num_timesteps - num_timesteps_for_main
             prompt_type = prompt_types[i]
-            if timesteps_for_prompt > 0:
+            if num_timesteps_for_prompt > 0:
                 assert prompt_type in self.prompt_types, 'Invalid prompt type'
-                if timesteps_for_prompt >= ep_len:
+                if num_timesteps_for_prompt >= ep_len:
                     # sample entire episode
                     prompt_start = 0
                     prompt_end = ep_len - 1
-                if prompt_type == 'start':
+                elif prompt_type == 'start':
                     prompt_start = 0
-                    prompt_end = timesteps_for_prompt - 1
+                    prompt_end = num_timesteps_for_prompt - 1
                 elif prompt_type == 'end':
                     prompt_end = ep_len - 1
-                    prompt_start = prompt_end - timesteps_for_prompt + 1
+                    prompt_start = prompt_end - num_timesteps_for_prompt + 1
                 elif prompt_type == 'uniform':
-                    prompt_start = np.random.randint(0, ep_len - timesteps_for_prompt)
-                    prompt_end = prompt_start + timesteps_for_prompt - 1
+                    prompt_start = np.random.randint(0, ep_len - num_timesteps_for_prompt)
+                    prompt_end = prompt_start + num_timesteps_for_prompt - 1
+                else:
+                    raise NotImplementedError(f'Invalid prompt type: {prompt_type}')
+            else:
+                prompt_start = None
+                prompt_end = None
+            timesteps_for_prompts.append((prompt_start, prompt_end))
 
-                # Extract prompt and add to main chunk
-                prompt_obs = episode.observations[prompt_start:(prompt_end + 1),]
-                prompt_actions = episode.actions[prompt_start:(prompt_end + 1),]
-                episodes_data['observations'][i] = np.concatenate([prompt_obs, episodes_data['observations'][i]], axis=0)
-                episodes_data['actions'][i] = np.concatenate([prompt_actions, episodes_data['actions'][i]], axis=0)
+        # now we have indices to get from each episode
+        episodes_data = self.get_episodes_sliced(episode_indices, timesteps_for_mains, timesteps_for_prompts)
 
 
         # Convert to dictionary for each episode
@@ -310,7 +295,29 @@ class ControlTask(Task):
             }
             episode_dicts.append(episode_dict)
         return episode_dicts
-    
+
+    def get_episodes_sliced(self, episode_indices, timesteps_for_mains, timesteps_for_prompts):
+        episodes_data = {
+            'actions': [],
+            'observations': [],
+        }
+        with h5py.File(self.dataset.spec.data_path, 'r') as f:
+            # iterate over episodes
+            for i, episode_index in enumerate(episode_indices):
+                ep_group = f[f"episode_{episode_index}"]
+                main_start, main_end = timesteps_for_mains[i]
+                prompt_start, prompt_end = timesteps_for_prompts[i]
+                obs = ep_group["observations"][main_start:(main_end + 1),]
+                actions = ep_group["actions"][main_start:(main_end + 1),]
+                if prompt_start is not None:
+                    prompt_obs = ep_group["observations"][prompt_start:(prompt_end + 1),]
+                    prompt_actions = ep_group["actions"][prompt_start:(prompt_end + 1),]
+                    obs = np.concatenate([prompt_obs, obs], axis=0)
+                    actions = np.concatenate([prompt_actions, actions], axis=0)
+                episodes_data['observations'].append(obs)
+                episodes_data['actions'].append(actions)
+        return episodes_data
+
     # Extension of default Minari sample_episodes where custom episode_indices can be passed
     def sample_episodes(self, n_episodes: int, episode_indices: list = None):
         """Sample n number of episodes from the dataset.
