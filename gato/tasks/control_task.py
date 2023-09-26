@@ -107,13 +107,13 @@ class ControlTask(Task):
             with h5py.File(self.dataset.spec.data_path, 'r') as f:
                 self.episode_lengths.append(f[f'episode_{i}']['rewards'].shape[0])
             prev_index = i
-    
     def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []
         clipped_returns = []
         ep_lens = []
         metrics = {}
+        max_len = self.args.max_eval_len
 
         context_timesteps = model.context_len // self.tokens_per_timestep # amount of timesteps that fit into context
 
@@ -158,6 +158,8 @@ class ControlTask(Task):
                 ep_return += reward 
                 ep_clipped_return += np.clip(reward, -1.0, 1.0)
                 ep_len += 1
+                if max_len is not None and ep_len >= max_len:
+                    done = True
             returns.append(ep_return)
             clipped_returns.append(ep_clipped_return)
             ep_lens.append(ep_len)
@@ -259,7 +261,6 @@ class ControlTask(Task):
                 prompt_start = None
                 prompt_end = None
             timesteps_for_prompts.append((prompt_start, prompt_end))
-
         # now we have indices to get from each episode
         episodes_data = self.get_episodes_sliced(episode_indices, timesteps_for_mains, timesteps_for_prompts)
 

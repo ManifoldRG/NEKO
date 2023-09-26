@@ -201,6 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_episodes', type=int, default=10)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=False)
+    parser.add_argument('--max_eval_len', type=int, default=None) # default unbounded
 
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
