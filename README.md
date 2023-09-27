@@ -16,7 +16,7 @@ Practically, building these systems provides us deeper understanding into the ut
 
 ## [NEKO Open Issues and Tasks](https://github.com/orgs/ManifoldRG/projects/12)
 
-## [Contributing Guide](https://github.com/ManifoldRG/NEKO/blob/main/CONTRIBUTING.md)
+## [Contributing Guide](https://github.com/ManifoldRG/NEKO/blob/master/CONTRIBUTING.md)
 
 ## [GATO-Control Implementation](https://github.com/ManifoldRG/gato-control/tree/master/gato)
 
