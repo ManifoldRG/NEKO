@@ -126,7 +126,8 @@ if __name__ == '__main__':
     parser.add_argument('--promptless_eval', action='store_true', default=None)
     parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
     parser.add_argument('--render', action='store_true', default=None)
-
+    parser.add_argument('--max_eval_len', type=int, default=None) # default unbounded
+    
     # datasets / envs
     parser.add_argument('--datasets', type=str, nargs='+', default=None)
 

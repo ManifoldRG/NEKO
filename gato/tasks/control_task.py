@@ -128,7 +128,6 @@ class ControlTask(Task):
 
             if promptless_eval:
                 input_dict = None
-
             done = False
             ep_return = 0
             ep_clipped_return = 0
