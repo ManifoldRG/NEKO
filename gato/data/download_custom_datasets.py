@@ -8,7 +8,7 @@ mujoco_datasets = {
      #'Breakout-top1-s1-v0': 'https://drive.google.com/drive/folders/1Elos7A-NbpDzr5bPpPmoM-_2qY_68KFi?usp=drive_link' 
 }
 
-atari_top_1 = 'https://drive.google.com/file/d/188H5MY76De0qd4l0cMbdIiubLa5Faql5/view?usp=sharing'
+atari_top_1 = 'https://drive.google.com/drive/u/1/folders/1y1u9YIe9Js-KZ6c9T4wUISZkY5ZOoILR'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -25,7 +25,8 @@ if __name__ == '__main__':
 
     # download datasets, if they do not exist already
     if args.download_group == 'TOP1_ATARI_TEST':
-        gdown.download_folder(url=atari_top_1, output=datasets_dir, quiet=False, use_cookies=False)
+        # gdown.download_folder(url=atari_top_1, output=datasets_dir, quiet=False, use_cookies=False)
+        gdown.download(url=atari_top_1, output=datasets_dir, quiet=False, use_cookies=False)
         #unzip the file
         os.system(f'unzip {os.path.join(datasets_dir, "TOP1_ATARI_TEST.zip")} -d {datasets_dir}')
     else:
