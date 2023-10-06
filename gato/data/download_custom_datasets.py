@@ -8,7 +8,7 @@ mujoco_datasets = {
      #'Breakout-top1-s1-v0': 'https://drive.google.com/drive/folders/1Elos7A-NbpDzr5bPpPmoM-_2qY_68KFi?usp=drive_link' 
 }
 
-atari_top_1 = 'https://drive.google.com/file/d/188H5MY76De0qd4l0cMbdIiubLa5Faql5/view?usp=drive_link'
+atari_top_1 = 'https://drive.google.com/uc?id=188H5MY76De0qd4l0cMbdIiubLa5Faql5'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
