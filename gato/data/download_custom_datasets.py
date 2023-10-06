@@ -26,7 +26,8 @@ if __name__ == '__main__':
     # download datasets, if they do not exist already
     if args.download_group == 'TOP1_ATARI_TEST':
         # gdown.download_folder(url=atari_top_1, output=datasets_dir, quiet=False, use_cookies=False)
-        gdown.download(url=atari_top_1, output=datasets_dir, quiet=False, use_cookies=False)
+        gdown.download(url=atari_top_1, output=os.path.join(datasets_dir, 'TOP1_ATARI_TEST.zip'), quiet=False, use_cookies=False)
+        gdown.download
         #unzip the file
         os.system(f'unzip {os.path.join(datasets_dir, "TOP1_ATARI_TEST.zip")} -d {datasets_dir}')
     else:
