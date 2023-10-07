@@ -4,6 +4,7 @@ import os
 
 import wandb
 import torch
+import numpy as np
 
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
@@ -42,7 +43,6 @@ def main(args):
             top_k_prompting = args.top_k
         )
         tasks.append(task)
-
     model = GatoPolicy(
         device=args.device,
         embed_dim=args.embed_dim,
