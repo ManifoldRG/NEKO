@@ -88,6 +88,7 @@ class Trainer:
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
+                    pass
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start

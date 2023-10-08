@@ -427,6 +427,10 @@ class GatoPolicy(nn.Module):
         token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
         
         output_ids = input_tokens.clone()
+        only_predicted_ids = None
+        print(f'shape of output_ids before begin of loop in predict_text : {output_ids.size()}')
+        print(f'shapes-> token_emb : {token_embeddings.size()} | input_tokens: {input_tokens.size()} | token_masks: {token_masks.size()}')
+        print(f'eos token is : {self.text_tokenizer.eos_token_id}')
         
         for i in range(max_length):
         
@@ -435,7 +439,9 @@ class GatoPolicy(nn.Module):
             # next_token_logits = logits[:, -1, :]
             
             if deterministic:
-                next_token = torch.argmax(logits, dim=-1)
+                next_token_full = torch.argmax(logits, dim=-1)
+                next_token = next_token_full[:, i:i+1] # only gets one token predicted 
+                print(f'i={i}; next token predicted : {next_token}')
             else:
                 # sample from logits
                 probs = torch.nn.functional.softmax(logits, dim=-1)
@@ -455,10 +461,17 @@ class GatoPolicy(nn.Module):
             token_embeddings = token_embeddings[:, -self.context_len:, :]
             token_masks = token_masks[:, -self.context_len:]
             
-            # Append to output
-            output_ids = torch.cat([output_ids, next_token], dim=-1)
+            if only_predicted_ids is None:
+                only_predicted_ids = next_token.clone()
+            else:
+                only_predicted_ids = torch.cat([only_predicted_ids, next_token], dim=-1)
+            
+        # Append to output
+        output_ids = torch.cat([output_ids, only_predicted_ids], dim=-1)
         
-        return output_ids
+        print(f'shape of output_ids after return : {output_ids.size()}')
+        print(f'shape of only_predicted_ids after return : {only_predicted_ids.size()}')
+        return only_predicted_ids
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
     def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):

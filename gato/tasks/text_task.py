@@ -4,7 +4,9 @@ from gato.tasks.task import Task, TaskTypeEnum
 import numpy as np
 import math
 from torch.nn import functional as F
+from torch import nn
 from typing import List
+from transformers import AutoTokenizer, GPT2Tokenizer
 
 class TextTask(Task): 
        
@@ -19,6 +21,7 @@ class TextTask(Task):
             # https://huggingface.co/docs/datasets/v2.14.4/en/process#concatenate
             # must have the same feature columns
             self.text_dataset = concatenate_datasets(text_datasets_list)
+        
         
     def sample_batch(self, batch_size):
         random_indices = np.random.randint(0, len(self.text_dataset['train']), size=batch_size)
@@ -53,15 +56,31 @@ class TextTask(Task):
         
         for idx in range(num_examples_to_test):
             text = self.text_dataset['test'][idx]['text']
+            if not text:
+                continue 
             target_text = self.text_dataset['test'][idx]['text']
+            print(f'target_text: {target_text}')
             
-            output_ids = model.predict_text(text, max_length=100, deterministic=deterministic)
+            output_ids = model.predict_text(text, max_length=20, deterministic=deterministic)
             print(f'output_ids:{output_ids}')
-            output_text = text_tokenizer.decode(output_ids)
-            print(f'Generated text:{output_text}')
+            print(f'output_ids size:{output_ids.size()}')
+            # output_text = text_tokenizer.decode(output_ids)
+            # print(f'Generated text:{output_text}')
             
-            target_ids = text_tokenizer.encode(target_text)
-            l = F.cross_entropy(output_ids, target_ids)
+            target_ids = text_tokenizer.encode(target_text, return_tensors='pt')
+            
+            # pad shorter to match length
+            max_len = max(output_ids.size(1), target_ids.size(1))
+            print(f'max_len : {max_len}')
+            if output_ids.size(1) < max_len:
+               output_ids = F.pad(output_ids, [0, max_len - output_ids.size(1)], mode='constant', value=0)
+            if target_ids.size(1) < max_len:
+               target_ids = F.pad(target_ids, [0, max_len - target_ids.size(1)], mode='constant', value=0)
+            
+            print(f'output_ids size:{output_ids.size()}')
+            print(f'target_ids size: {target_ids.size()}')
+            l = nn.CrossEntropyLoss(output_ids, target_ids, ignore_index=0)
+            # l = F.cross_entropy(output_ids.float(), target_ids.float())
             loss += l
             num_tokens += len(target_ids)
         
