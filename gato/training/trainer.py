@@ -85,9 +85,10 @@ class Trainer:
                     for k, v in eval_logs.items():
                         logs[f'evaluation/{task.name}/{k}'] = v
                 elif task.task_type == TaskTypeEnum.TEXT.value:
-                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic)
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
+                    pass
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
@@ -100,6 +101,7 @@ class Trainer:
                 print(f'Iteration {iter}')
                 for k, v in logs.items():
                     print(f'{k}: {v}')
+                print('=' * 80)
 
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':
@@ -113,6 +115,9 @@ class Trainer:
     def train_step(self):
         logs = {}
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
+        # Build training batch
+        start_time = time.time()
+        logs['time/sample_batch'] = time.time() - start_time
 
         # Calculate text and control batch sizes based on text_prop
         text_batch_size = int(self.args.text_prop * self.args.batch_size)
@@ -136,7 +141,6 @@ class Trainer:
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
-
         return loss.detach().cpu().item(), logs
 
     def sample_text_batch(self, batch_size):
@@ -183,5 +187,4 @@ class Trainer:
             # sample episodes from dataset
             if total_task_batch_size > 0:
                 task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
-                batch_dicts.extend(task_episode_dicts)
         return batch_dicts

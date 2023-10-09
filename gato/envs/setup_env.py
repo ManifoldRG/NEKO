@@ -1,16 +1,33 @@
 import minari
 import gymnasium as gym
 
-from gato.envs.atari import load_atari_env
+from gato.envs.atari import load_atari_env, TRAIN_GAMES as ATARI_TRAIN, TEST_GAMES as ATARI_TEST
 
 custom_env_loaders = {
     'ALE/': load_atari_env
+}
+
+minari_str = '{}-top1-s1-v0'
+custom_key_words = {
+    'TOP1_ATARI_TRAIN': [minari_str.format(game_name) for game_name in ATARI_TRAIN],
+    'TOP1_ATARI_TEST': [minari_str.format(game_name) for game_name in ATARI_TEST]
 }
 
 
 def load_envs(dataset_names: list, load_kwargs: dict = {}):
     envs = []
     datasets = []
+
+    new_dataset_names = []
+
+    # scan for custom keywords
+    for dataset_name in dataset_names:
+        if dataset_name in custom_key_words:
+            new_dataset_names.extend(custom_key_words[dataset_name])
+        else:
+            new_dataset_names.append(dataset_name)
+    dataset_names = new_dataset_names
+
     for dataset_name in dataset_names:
         env, dataset = load_env_dataset(dataset_name, load_kwargs)
         envs.append(env)
