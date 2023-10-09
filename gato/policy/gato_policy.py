@@ -70,15 +70,6 @@ class GatoPolicy(nn.Module):
         }
 
 
-        # self.transformer = HFGPT(
-        #     n_embd=embed_dim,
-        #     n_layer=layers,
-        #     n_head=heads,
-        #     dropout=dropout,
-        #     vocab_size=self.vocab_size,
-        #     n_positions=context_len,
-        #     activation_fn=activation_fn,
-        # )
         if pretrained_lm is not None:
             print(f'loading pretrained GPT2 weights')
             config = transformers.GPT2Config.from_pretrained(pretrained_lm)
