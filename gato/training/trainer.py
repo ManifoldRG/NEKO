@@ -149,68 +149,22 @@ class Trainer:
         end_indices = np.random.choice(prompt_indices, size=round(len(prompt_indices) / 2), replace=False).tolist()
         uniform_indices = [i for i in prompt_indices if i not in end_indices]
 
-        if True:
-            # aggregate acrosss tasks sampled multiple times
-            for i, task in enumerate(self.tasks):
-                total_task_batch_size = 0
-                task_vanilla_batch_size = 0
-                task_prompted_batch_sizes = {}
-                for type_index, task_index in enumerate(sampled_task_indices):
-                    if task_index == i:
-                        total_task_batch_size += 1
-                        if type_index in end_indices:
-                            task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
-                        elif type_index in uniform_indices:
-                            task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
-                        else:
-                            task_vanilla_batch_size += 1
-                # sample episodes from dataset
-                if total_task_batch_size > 0:
-                    task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
-                    batch_dicts.extend(task_episode_dicts)
-            return batch_dicts
-        else:
-            batch_dicts = []
-            # Create a pool of worker processes
-            # with Pool() as pool:
-            # Define the arguments to be passed to each worker process
-            args = [(i, task, sampled_task_indices, end_indices, uniform_indices, self.device, self.args.sequence_length) for i, task in enumerate(self.tasks)]
-            # Start the worker processes and collect the results
-            #results = pool.map(task_worker, args)
-
-            # with ThreadPoolExecutor() as executor:
-            #     results = list(executor.map(task_worker, args))
-            import pdb; pdb.set_trace()
-            with ProcessPoolExecutor() as executor:
-                results = list(executor.map(task_worker, args))
-
-            # Combine the results from all the processes into a single list
-            batch_dicts = [item for sublist in results for item in sublist]
-            
-            return batch_dicts
-
-
-def task_worker(args):
-    # Unpack the arguments
-    i, task, sampled_task_indices, end_indices, uniform_indices, device, max_tokens = args
-
-    total_task_batch_size = 0
-    task_vanilla_batch_size = 0
-    task_prompted_batch_sizes = {}
-
-    for type_index, task_index in enumerate(sampled_task_indices):
-        if task_index == i:
-            total_task_batch_size += 1
-            if type_index in end_indices:
-                task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
-            elif type_index in uniform_indices:
-                task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
-            else:
-                task_vanilla_batch_size += 1
-
-    # Sample episodes from dataset
-    if total_task_batch_size > 0:
-        task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, device, max_tokens=max_tokens)
-        return task_episode_dicts
-    else:
-        return []   
+        # aggregate acrosss tasks sampled multiple times
+        for i, task in enumerate(self.tasks):
+            total_task_batch_size = 0
+            task_vanilla_batch_size = 0
+            task_prompted_batch_sizes = {}
+            for type_index, task_index in enumerate(sampled_task_indices):
+                if task_index == i:
+                    total_task_batch_size += 1
+                    if type_index in end_indices:
+                        task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
+                    elif type_index in uniform_indices:
+                        task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
+                    else:
+                        task_vanilla_batch_size += 1
+            # sample episodes from dataset
+            if total_task_batch_size > 0:
+                task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
+                batch_dicts.extend(task_episode_dicts)
+        return batch_dicts
