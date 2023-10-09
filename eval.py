@@ -80,7 +80,8 @@ def main(args):
         use_pos_encoding=not eval_args.disable_inner_pos_encoding,
         activation_fn=eval_args.activation_fn,
         pretrained_lm=eval_args.pretrained_lm,
-        flash=eval_args.flash
+        flash=eval_args.flash,
+        flash_layers=eval_args.flash_layers,
     )
     if eval_args.get('lora', False):
         assert eval_args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'

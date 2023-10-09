@@ -49,6 +49,8 @@ def main(args):
         tasks.append(task)
     
     if len(args.text_datasets) > 0:
+        assert (not args.textless_vocab), 'need vocab for text datasets'
+
         # add text datasets
         tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
     else:
@@ -74,6 +76,7 @@ def main(args):
         flash=args.flash,
         tokenizer_model_name=args.tokenizer_model_name,
         pad_seq=args.pad_seq,
+        textless_vocab=args.textless_vocab,
     )
     args.embed_dim = model.embed_dim
     model = accelerator.prepare(model)
@@ -209,6 +212,8 @@ if __name__ == '__main__':
     parser.add_argument('--log_eval_freq', type=int, default=100_000)
 
     parser.add_argument('--pad_seq', action='store_true', default=False) # pad sequences to max length
+
+    parser.add_argument('--textless_vocab', action='store_true', default=False) # use textless vocab
 
 
     # evaluation
