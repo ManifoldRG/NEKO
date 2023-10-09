@@ -115,6 +115,9 @@ class Trainer:
     def train_step(self):
         logs = {}
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
+        # Build training batch
+        start_time = time.time()
+        logs['time/sample_batch'] = time.time() - start_time
 
         # Calculate text and control batch sizes based on text_prop
         text_batch_size = int(self.args.text_prop * self.args.batch_size)
@@ -138,7 +141,6 @@ class Trainer:
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
-
         return loss.detach().cpu().item(), logs
 
     def sample_text_batch(self, batch_size):
@@ -185,5 +187,4 @@ class Trainer:
             # sample episodes from dataset
             if total_task_batch_size > 0:
                 task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
-                batch_dicts.extend(task_episode_dicts)
         return batch_dicts
