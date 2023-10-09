@@ -194,7 +194,7 @@ class Trainer:
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
-        if True:
+        if False:
             batch_dicts = [batch_dict for batch_dict in self.control_dl][0]
             for i in range(len(batch_dicts)):
                 for k, v in batch_dicts[i].items():
