@@ -395,7 +395,6 @@ class GatoPolicy(nn.Module):
         tokens = torch.cat(tokens, dim=0)
         token_target_masks = torch.cat(token_target_masks, dim=0)
         token_masks = torch.cat(token_masks, dim=0)
-
         if self.pad_seq:
             # get seq length
             seq_len = token_embeddings.shape[1]

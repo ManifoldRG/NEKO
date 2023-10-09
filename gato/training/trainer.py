@@ -132,9 +132,8 @@ class Trainer:
 
         # Combine the batches
         combined_batch_dicts = text_batch_dicts + control_batch_dicts
-        
-        logs['time/sample_batch'] = time.time() - start_time
 
+        logs['time/sample_batch'] = time.time() - start_time
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
             logits, loss = self.model.forward(inputs = combined_batch_dicts, compute_loss=True)
