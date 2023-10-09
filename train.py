@@ -4,6 +4,8 @@ import os
 
 import wandb
 import torch
+import torch.multiprocessing as mp
+
 import numpy as np
 
 from peft import LoraConfig, TaskType, get_peft_model
@@ -43,7 +45,6 @@ def main(args):
             args = args,
             context_len = args.sequence_length,
             training_prompt_len_proportion=args.prompt_len_proportion,
-            share_prompt_episodes = not args.unique_prompt_episodes,
             top_k_prompting = args.top_k
         )
         tasks.append(task)
@@ -139,6 +140,8 @@ def main(args):
 
 
 if __name__ == '__main__':
+    #mp.set_start_method('spawn')
+
     parser = argparse.ArgumentParser()
 
     # Accelerate args
@@ -231,7 +234,7 @@ if __name__ == '__main__':
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
     parser.add_argument('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
-    parser.add_argument('--unique_prompt_episodes', default=False, action='store_true')
+    # parser.add_argument('--unique_prompt_episodes', default=False, action='store_true')
     parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
 
     # logging

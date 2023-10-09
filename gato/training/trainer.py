@@ -1,15 +1,18 @@
 import time
 import os
+from functools import partial
 
 import wandb
 import numpy as np
 import torch
+from torch.utils.data import DataLoader, RandomSampler
+# import torch.multiprocessing as mp
+# mp.set_start_method('spawn')
 
 from gato.utils.utils import save_model
 from gato.tasks.task import TaskTypeEnum
-
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import ProcessPoolExecutor
+from gato.tasks.control_dataset import TaskDataset
+from gato.tasks.control_minimal_task import ControlMinimalTask
 
 class Trainer:
     def __init__(
@@ -27,6 +30,37 @@ class Trainer:
         self.scheduler = scheduler
         self.accelerator = accelerator
         self.tasks = tasks
+
+        # Calculate text and control batch sizes based on text_prop
+        self.text_batch_size = int(args.text_prop * args.batch_size)
+        self.control_batch_size = args.batch_size - self.text_batch_size
+
+        self.control_tasks = [t for t in tasks if t.task_type == TaskTypeEnum.CONTROL.value]
+
+        if len(self.control_tasks) > 0:
+            min_tasks = [ControlMinimalTask(t) for t in self.control_tasks]
+            self.control_ds = TaskDataset(
+                device=model.device,
+                seq_len=args.sequence_length,
+                prompt_ep_proportion=args.prompt_ep_proportion,
+                tasks=min_tasks,
+            )
+            self.control_sampler = RandomSampler(self.control_ds, replacement=True, num_samples=self.control_batch_size)
+            n_workers = os.cpu_count()
+            n_workers = 0
+            collate_fn = partial(collate_control, model.device)
+            self.control_dl =  DataLoader(
+                self.control_ds, 
+                sampler=self.control_sampler, 
+                batch_size=self.control_batch_size, 
+                collate_fn=collate_fn, 
+                num_workers=n_workers, 
+            )
+        else:
+            self.control_ds = None
+            self.control_dl = None
+
+
         self.max_lengths = [np.max(t.episode_lengths) for t in tasks]
         self.mean_lengths = [np.mean(t.episode_lengths) for t in tasks]
         print(f'Max lengths: {self.max_lengths}')
@@ -125,21 +159,17 @@ class Trainer:
         # Build training batch
         start_time = time.time()
 
-        # Calculate text and control batch sizes based on text_prop
-        text_batch_size = int(self.args.text_prop * self.args.batch_size)
-        control_batch_size = self.args.batch_size - text_batch_size
         text_batch_dicts = []
         control_batch_dicts = []
 
         # Sample text and control batches
-        if text_batch_size > 0:
-            text_batch_dicts = self.sample_text_batch(text_batch_size)
-        if control_batch_size > 0:
-            control_batch_dicts = self.sample_control_batch(control_batch_size)
+        if self.text_batch_size > 0:
+            text_batch_dicts = self.sample_text_batch(self.text_batch_size)
+        if self.control_batch_size > 0:
+            control_batch_dicts = self.sample_control_batch(self.control_batch_size)
 
         # Combine the batches
         combined_batch_dicts = text_batch_dicts + control_batch_dicts
-
         logs['time/sample_batch'] = time.time() - start_time
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
@@ -164,38 +194,54 @@ class Trainer:
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
-        sampled_task_indices = []
-        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL.value]
-        n_tasks = len(control_tasks)
-        while len(sampled_task_indices) < batch_size:
-            max_n = min(n_tasks, batch_size - len(sampled_task_indices))
-            new_tasks = np.random.choice(np.arange(n_tasks), size=max_n, replace=False).tolist()
-            sampled_task_indices.extend(new_tasks)
+        if True:
+            batch_dicts = [batch_dict for batch_dict in self.control_dl][0]
+            for i in range(len(batch_dicts)):
+                for k, v in batch_dicts[i].items():
+                    if v is not None:
+                        batch_dicts[i][k] = v.to(self.device)
 
-        n_prompted_episodes = round(batch_size * self.args.prompt_ep_proportion)
-        vanilla_batch_size = batch_size - n_prompted_episodes
+        else:
+            sampled_task_indices = []
+            control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL.value]
+            n_tasks = len(control_tasks)
+            while len(sampled_task_indices) < batch_size:
+                max_n = min(n_tasks, batch_size - len(sampled_task_indices))
+                new_tasks = np.random.choice(np.arange(n_tasks), size=max_n, replace=False).tolist()
+                sampled_task_indices.extend(new_tasks)
 
-        # determine prompted episodes and their prompting type (end or uniform)
-        prompt_indices = np.random.choice(batch_size, size=n_prompted_episodes, replace=False).tolist()
-        end_indices = np.random.choice(prompt_indices, size=round(len(prompt_indices) / 2), replace=False).tolist()
-        uniform_indices = [i for i in prompt_indices if i not in end_indices]
+            n_prompted_episodes = round(batch_size * self.args.prompt_ep_proportion)
+            vanilla_batch_size = batch_size - n_prompted_episodes
 
-        # aggregate acrosss tasks sampled multiple times
-        for i, task in enumerate(control_tasks):
-            total_task_batch_size = 0
-            task_vanilla_batch_size = 0
-            task_prompted_batch_sizes = {}
-            for type_index, task_index in enumerate(sampled_task_indices):
-                if task_index == i:
-                    total_task_batch_size += 1
-                    if type_index in end_indices:
-                        task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
-                    elif type_index in uniform_indices:
-                        task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
-                    else:
-                        task_vanilla_batch_size += 1
-            # sample episodes from dataset
-            if total_task_batch_size > 0:
-                task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
-                batch_dicts.extend(task_episode_dicts)
+            # determine prompted episodes and their prompting type (end or uniform)
+            prompt_indices = np.random.choice(batch_size, size=n_prompted_episodes, replace=False).tolist()
+            end_indices = np.random.choice(prompt_indices, size=round(len(prompt_indices) / 2), replace=False).tolist()
+            uniform_indices = [i for i in prompt_indices if i not in end_indices]
+
+            # aggregate acrosss tasks sampled multiple times
+            for i, task in enumerate(control_tasks):
+                total_task_batch_size = 0
+                task_vanilla_batch_size = 0
+                task_prompted_batch_sizes = {}
+                for type_index, task_index in enumerate(sampled_task_indices):
+                    if task_index == i:
+                        total_task_batch_size += 1
+                        if type_index in end_indices:
+                            task_prompted_batch_sizes['end'] = task_prompted_batch_sizes.get('end', 0) + 1
+                        elif type_index in uniform_indices:
+                            task_prompted_batch_sizes['uniform'] = task_prompted_batch_sizes.get('uniform', 0) + 1
+                        else:
+                            task_vanilla_batch_size += 1
+                # sample episodes from dataset
+                if total_task_batch_size > 0:
+                    task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
+                    batch_dicts.extend(task_episode_dicts)
         return batch_dicts
+
+def collate_control(device, batch):
+    # set to device
+    # for i in range(len(batch)):
+    #     for k, v in batch[i].items():
+    #         if v is not None:
+    #             batch[i][k] = v.to(device)
+    return batch

@@ -31,7 +31,6 @@ class ControlTask(Task):
             context_len: int,
             args,
             training_prompt_len_proportion=0.5, 
-            share_prompt_episodes=True,
             top_k_prompting=None
         ):
         super().__init__(task_type)
@@ -84,7 +83,7 @@ class ControlTask(Task):
         assert self.training_prompt_len_proportion >= 0 and self.training_prompt_len_proportion <= 1
         
         # Specifies if prompt should come from the same episode as the main chunk during training
-        self.share_prompt_episodes = share_prompt_episodes
+        # self.share_prompt_episodes = share_prompt_episodes
 
         # Ways of sampling prompts
         self.prompt_types = ['start', 'end','uniform']
@@ -92,6 +91,7 @@ class ControlTask(Task):
         # If prompts should be sampled from top k episodes, or uniform during eval
         self.top_k_prompting = top_k_prompting
         if self.top_k_prompting is not None:
+            raise NotImplementedError('Top k prompting not implemented')
             assert self.top_k_prompting > 0 and self.top_k_prompting <= self.dataset.total_episodes, 'top k must be between 0 and total episodes for all datasets'
             # calculate top k ep ids
             ep_returns = np.array([ep.rewards.sum() for ep in self.dataset])
@@ -122,7 +122,7 @@ class ControlTask(Task):
             observation, info = self.env.reset()
 
             # sample prompt
-            input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, share_prompt_episodes=True,ep_ids=self.top_ids)[0]
+            input_dict = self.sample_batch_configurable(batch_size=1, device=model.device, prompt_proportions=[1.], prompt_types = ['end'], max_tokens = model.context_len, ep_ids=self.top_ids)[0]
             
             # infer dtypes
             action_type = input_dict[self.action_str].dtype
@@ -200,7 +200,6 @@ class ControlTask(Task):
             prompt_propotions,
             prompt_types,
             max_tokens=max_tokens,
-            share_prompt_episodes=self.share_prompt_episodes
         )
         
         return episode_dicts
@@ -211,8 +210,7 @@ class ControlTask(Task):
             prompt_proportions: list, 
             prompt_types: list, 
             max_tokens: int = 1024, 
-            share_prompt_episodes=True,
-            ep_ids = None
+            ep_ids = None,
         ):
         # Samples a batch of episodes, where each episode has maximum of max_tokens tokens
         # This will return a list of dictionaries, where each dicionary contains variable length tensors,
@@ -339,30 +337,31 @@ class ControlTask(Task):
 
 class ControlImageTransform:
     def __init__(self, env, patch_size=16):
-        self.env = env
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
         self.patch_size = patch_size
 
-        assert type(self.env.observation_space) == gym.spaces.Box, 'Only supports Box observation space'
-        assert len(self.env.observation_space.shape) == 3 or len(self.env.observation_space.shape) == 2, 'Only supports 2D or 3D observation space'
+        assert type(self.observation_space) == gym.spaces.Box, 'Only supports Box observation space'
+        assert len(self.observation_space.shape) == 3 or len(self.observation_space.shape) == 2, 'Only supports 2D or 3D observation space'
 
         self.channel_first = None
         self.grayscale = False
 
         # Check if grayscale or RGB
-        if len(self.env.observation_space.shape) == 3:
+        if len(self.observation_space.shape) == 3:
             # Check if channel first or channel last
-            assert self.env.observation_space.shape[0] == 3 or self.env.observation_space.shape[-1] == 3, '3 channel first or channel last'
-            self.channel_first = self.env.observation_space.shape[0] == 3
+            assert self.observation_space.shape[0] == 3 or self.observation_space.shape[-1] == 3, '3 channel first or channel last'
+            self.channel_first = self.observation_space.shape[0] == 3
             if self.channel_first:
-                self.height = self.env.observation_space.shape[1]
-                self.width = self.env.observation_space.shape[2]
+                self.height = self.observation_space.shape[1]
+                self.width = self.observation_space.shape[2]
             else:
-                self.height = self.env.observation_space.shape[0]
-                self.width = self.env.observation_space.shape[1]
+                self.height = self.observation_space.shape[0]
+                self.width = self.observation_space.shape[1]
         else:
             self.grayscale = True
-            self.height = self.env.observation_space.shape[0]
-            self.width = self.env.observation_space.shape[1]
+            self.height = self.observation_space.shape[0]
+            self.width = self.observation_space.shape[1]
 
         # check how much padding is needed
         self.padding_h = 0
