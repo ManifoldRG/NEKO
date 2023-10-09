@@ -7,6 +7,7 @@ from torch.nn import functional as F
 from torch import nn
 from typing import List
 from transformers import AutoTokenizer, GPT2Tokenizer
+import torch
 
 class TextTask(Task): 
        
@@ -44,54 +45,49 @@ class TextTask(Task):
         # current format expected is a list of dict
         return batch_dicts
 
-    def evaluate(self, model, num_examples_to_test=100, deterministic=True):
-        
-        loss = 0
-        num_tokens = 0
-        text_tokenizer = model.text_tokenizer
+    def evaluate(self, model, num_examples_to_test=100, deterministic=True, log_examples_to_output=False):
+        tokenizer = model.text_tokenizer
+        loss_fn = nn.CrossEntropyLoss()
+        total_loss = 0
+        total_tokens = 0
         
         if num_examples_to_test > len(self.text_dataset['test']):
             print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.text_dataset['test'])
-        
+
+        if log_examples_to_output:
+            print(f'--- examples ---')
         for idx in range(num_examples_to_test):
             text = self.text_dataset['test'][idx]['text']
             if not text:
-                continue 
-            target_text = self.text_dataset['test'][idx]['text']
-            print(f'target_text: {target_text}')
+                continue
+
+            # Tokenize the text using the model's tokenizer
+            tokens = tokenizer.encode(text)
             
-            output_ids = model.predict_text(text, max_length=20, deterministic=deterministic)
-            print(f'output_ids:{output_ids}')
-            print(f'output_ids size:{output_ids.size()}')
-            # output_text = text_tokenizer.decode(output_ids)
-            # print(f'Generated text:{output_text}')
-            
-            target_ids = text_tokenizer.encode(target_text, return_tensors='pt')
-            
-            # pad shorter to match length
-            max_len = max(output_ids.size(1), target_ids.size(1))
-            print(f'max_len : {max_len}')
-            if output_ids.size(1) < max_len:
-               output_ids = F.pad(output_ids, [0, max_len - output_ids.size(1)], mode='constant', value=0)
-            if target_ids.size(1) < max_len:
-               target_ids = F.pad(target_ids, [0, max_len - target_ids.size(1)], mode='constant', value=0)
-            
-            print(f'output_ids size:{output_ids.size()}')
-            print(f'target_ids size: {target_ids.size()}')
-            l = nn.CrossEntropyLoss(output_ids, target_ids, ignore_index=0)
-            # l = F.cross_entropy(output_ids.float(), target_ids.float())
-            loss += l
-            num_tokens += len(target_ids)
-        
-        avg_loss = loss / num_tokens
-        perplexity = math.exp(avg_loss)
-        
+            # Split the tokens into input and target tokens
+            ith_position = np.random.randint(1, len(tokens))
+            input_tokens = tokens[:ith_position]
+            target_tokens = tokens[ith_position:]
+
+            # Generate prediction
+            pred_logits, pred_tokens = model.predict_text(tokenizer.decode(input_tokens), max_length=len(tokens)-len(input_tokens), deterministic=deterministic)
+            if log_examples_to_output and idx%10==0:
+                print(f'Text Example : {text} \n Input passed to model : {tokenizer.decode(input_tokens)} \n Predicted output : {tokenizer.decode(pred_tokens.squeeze())}')
+                print("----")
+
+            # Calculate loss
+            loss = loss_fn(pred_logits, torch.tensor(target_tokens))
+            total_loss += loss.item()
+            total_tokens += len(target_tokens)
+        if log_examples_to_output:
+            print(f'--- examples end ---')
+
+        avg_loss = total_loss / num_examples_to_test
+        perplexity = torch.exp(torch.tensor(avg_loss))
+
         metrics = {
             'loss': avg_loss,
-            'perplexity': perplexity
+            'perplexity': perplexity.item()
         }
         return metrics
-    
-
-    

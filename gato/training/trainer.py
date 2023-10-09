@@ -85,7 +85,7 @@ class Trainer:
                     for k, v in eval_logs.items():
                         logs[f'evaluation/{task.name}/{k}'] = v
                 elif task.task_type == TaskTypeEnum.TEXT.value:
-                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic)
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
                     pass
@@ -101,6 +101,7 @@ class Trainer:
                 print(f'Iteration {iter}')
                 for k, v in logs.items():
                     print(f'{k}: {v}')
+                print('=' * 80)
 
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':

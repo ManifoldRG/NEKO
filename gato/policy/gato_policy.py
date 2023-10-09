@@ -12,6 +12,7 @@ from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 from gato.tasks.control_task import ControlTask
+from torch.nn import functional as F
 
 class GatoPolicy(nn.Module):
     def __init__(
@@ -412,66 +413,53 @@ class GatoPolicy(nn.Module):
                 token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
 
-
     def predict_text(self, input_text, max_length=20, deterministic=True):
         """For a single text example, generate prediction (future text)"""
         
-        batch_dict = {
-            'text': input_text,
-            'images': None,
-            'continuous_obs': None,
-            'discrete_obs': None,
-            'continuous_actions': None,
-            'discrete_actions': None
-        }
-        token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
-        
-        output_ids = input_tokens.clone()
-        only_predicted_ids = None
-        print(f'shape of output_ids before begin of loop in predict_text : {output_ids.size()}')
-        print(f'shapes-> token_emb : {token_embeddings.size()} | input_tokens: {input_tokens.size()} | token_masks: {token_masks.size()}')
-        print(f'eos token is : {self.text_tokenizer.eos_token_id}')
-        
-        for i in range(max_length):
-        
-            # Forward pass
+        concat_probs = None
+        concat_pred_tokens = None
+
+        for _ in range(max_length):
+            batch_dict = {
+                'text': input_text,
+                'images': None,
+                'continuous_obs': None,
+                'discrete_obs': None,
+                'continuous_actions': None,
+                'discrete_actions': None
+            }
+            token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
+            
             logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
-            # next_token_logits = logits[:, -1, :]
+            next_token_logits = logits[:, -1, :]  # Get logits for the next token
             
+            probs = F.softmax(next_token_logits, dim=-1)
+            
+            # Select the next token
             if deterministic:
-                next_token_full = torch.argmax(logits, dim=-1)
-                next_token = next_token_full[:, i:i+1] # only gets one token predicted 
-                print(f'i={i}; next token predicted : {next_token}')
+                next_token = torch.argmax(probs, dim=-1).unsqueeze(0)
             else:
-                # sample from logits
-                probs = torch.nn.functional.softmax(logits, dim=-1)
-                next_token = torch.multinomial(probs, num_samples=1)[0]
+                next_token = torch.multinomial(probs, num_samples=1)
             
-            # Check for EOS token
-            if torch.eq(next_token, self.text_tokenizer.eos_token_id).any():
+            if concat_probs is None:
+                concat_probs = probs
+                concat_pred_tokens = next_token
+            else:
+                concat_probs = torch.cat([concat_probs, probs], dim=0)
+                concat_pred_tokens = torch.cat([concat_pred_tokens, next_token], dim=-1)
+
+            # Concatenate the next token to the input_ids so it gets used to build token embeddings again
+            input_tokens = torch.cat([input_tokens, next_token], dim=-1)
+            input_text = self.text_tokenizer.decode(input_tokens.squeeze())
+
+            # Stop generating tokens if the eos_token_id is generated
+            if next_token.item() == self.text_tokenizer.eos_token_id:
                 break
-            
-            # append to token_embeddings and token_masks
-            token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
-            new_embedding = self.embed_token(next_token) # check shape of new_emebddingss
-            new_embedding = new_embedding[:, -1, :]
-            token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
-            
-            # and trim to context len
-            token_embeddings = token_embeddings[:, -self.context_len:, :]
-            token_masks = token_masks[:, -self.context_len:]
-            
-            if only_predicted_ids is None:
-                only_predicted_ids = next_token.clone()
-            else:
-                only_predicted_ids = torch.cat([only_predicted_ids, next_token], dim=-1)
-            
-        # Append to output
-        output_ids = torch.cat([output_ids, only_predicted_ids], dim=-1)
-        
-        print(f'shape of output_ids after return : {output_ids.size()}')
-        print(f'shape of only_predicted_ids after return : {only_predicted_ids.size()}')
-        return only_predicted_ids
+
+        return concat_probs, concat_pred_tokens
+
+
+
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
     def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):

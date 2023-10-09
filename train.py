@@ -212,6 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=False)
     parser.add_argument('--eval_text_num_examples', type=int, default=100)
+    parser.add_argument('--eval_text_log_examples', action='store_true', default=False)
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
