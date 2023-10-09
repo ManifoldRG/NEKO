@@ -43,7 +43,8 @@ class GatoPolicy(nn.Module):
         pretrained_lm: str = None, # Optional, name of pretrained language model to use
         flash: bool = False, # TODO verify correctness
         tokenizer_model_name: str = 'gpt2',
-        pad_seq: bool = False
+        pad_seq: bool = False,
+        textless_vocab: bool = False
     ):
         super().__init__()
 
@@ -51,7 +52,10 @@ class GatoPolicy(nn.Module):
 
         self.context_len = context_len
         self.pad_seq = pad_seq
-        self.text_tokens = 50257 # gpt2
+        if textless_vocab:
+            self.text_tokens = 1 # reduces memory usage
+        else:
+            self.text_tokens = 50257 # gpt2
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
