@@ -80,6 +80,7 @@ class GatoPolicy(nn.Module):
         #     activation_fn=activation_fn,
         # )
         if pretrained_lm is not None:
+            print(f'loading pretrained GPT2 weights')
             config = transformers.GPT2Config.from_pretrained(pretrained_lm)
             config.attn_pdrop = dropout # 0.1
             config.resid_pdrop = dropout
@@ -90,6 +91,7 @@ class GatoPolicy(nn.Module):
                 config=config,
             )
             embed_dim = config.n_embd
+            self.embed_token = self.transformer.wte
         else:
             gate = False
             if activation_fn == 'geglu':
@@ -110,12 +112,13 @@ class GatoPolicy(nn.Module):
             config.n_ctx = context_len
             config.gate = gate
             self.transformer = self.transformer = GPT2Model(config)
+            # Token Embeddings
+            self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
 
         self.embed_dim = embed_dim
 
         # head
         self.predict_token = nn.Linear(embed_dim, self.vocab_size, bias=False)
-
 
         self.separator_token = nn.Parameter(torch.zeros(embed_dim))
 
@@ -129,10 +132,6 @@ class GatoPolicy(nn.Module):
         self.continuous_obs_tokenizer = ContinuousTokenizer(
             use_mu_law=True, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
         )
-
-
-        # Token Embeddings
-        self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
 
         ## Image Embeddings
         self.use_patch_pos_encoding = use_patch_pos_encoding
