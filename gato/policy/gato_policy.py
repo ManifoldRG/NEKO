@@ -256,6 +256,7 @@ class GatoPolicy(nn.Module):
             # tokenize text
             if 'text' in batch and batch['text'] is not None:
                 text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
+                text_tokens = text_tokens.to(self.device)
                 text_tokens = text_tokens.long()
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets_masks = torch.ones_like(text_tokens)
@@ -369,7 +370,7 @@ class GatoPolicy(nn.Module):
                 action_embeddings = torch.cat(action_embeddings, dim=1)
             else:
                 # Create empty action embeddings
-                action_embeddings = torch.zeros(batch_embeddings.shape[0], 0, self.embed_dim) 
+                action_embeddings = torch.zeros(batch_embeddings.shape[0], 0, self.embed_dim).to(self.device)
             batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
             tokens_per_timestep = batch_embeddings.shape[1] # number of tokens per timestep
             total_tokens = n_timesteps * tokens_per_timestep

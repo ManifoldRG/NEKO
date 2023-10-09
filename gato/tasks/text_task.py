@@ -77,7 +77,7 @@ class TextTask(Task):
                 print("----")
 
             # Calculate loss
-            loss = loss_fn(pred_logits, torch.tensor(target_tokens))
+            loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
         if log_examples_to_output:
