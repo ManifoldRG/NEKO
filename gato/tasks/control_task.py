@@ -5,7 +5,7 @@ import minari
 import h5py
 from minari.dataset.minari_dataset import EpisodeData
 
-from gato.tasks.task import Task
+from gato.tasks.task import Task, TaskTypeEnum
 
 supported_spaces = [
     gym.spaces.Box,
@@ -23,7 +23,8 @@ def tokens_per_space(space):
    
 class ControlTask(Task):
     def __init__(
-            self, 
+            self,
+            task_type: TaskTypeEnum,
             env_name: str, 
             env: gym.Env, 
             dataset: minari.MinariDataset, 
@@ -33,7 +34,7 @@ class ControlTask(Task):
             share_prompt_episodes=True,
             top_k_prompting=None
         ):
-        super().__init__()
+        super().__init__(task_type)
         self.name = env_name
         self.is_atari = 'ALE' in env_name
         self.env = env

@@ -15,6 +15,7 @@ from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.tasks.control_task import ControlTask
+from gato.tasks.task import TaskTypeEnum
 
 
 def main(args):
@@ -41,12 +42,14 @@ def main(args):
     env_args = {
         'render_mode': 'human' if args.render else None,
     }
-    envs, datasets = load_envs(eval_args.datasets, env_args) # Load Minari datasets and corresponding Gym environments
+
+    envs, datasets = load_envs(eval_args.control_datasets, env_args) # Load Minari datasets and corresponding Gym environments
 
     tasks = []
     env_names = []
     for env, dataset in zip(envs, datasets):
         task = ControlTask(
+            TaskTypeEnum.CONTROL.value,
             env.unwrapped.spec.id, 
             env, 
             dataset,
@@ -129,7 +132,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_eval_len', type=int, default=None) # default unbounded
     
     # datasets / envs
-    parser.add_argument('--datasets', type=str, nargs='+', default=None)
+    parser.add_argument('--control_datasets', type=str, nargs='+', default=None)
 
     args = parser.parse_args()
     args = DotDict(vars(args))

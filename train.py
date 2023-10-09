@@ -18,6 +18,8 @@ from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
+from gato.tasks.text_task import TextTask
+from gato.tasks.task import TaskTypeEnum
 
 
 def main(args):
@@ -27,14 +29,16 @@ def main(args):
     args.device = accelerator.device
 
     exp_id = random.randint(int(1e5), int(1e6) - 1)
-    exp_name = f'gato-control-{exp_id}'
+    exp_name = f'neko-gato-{exp_id}'
 
-    envs, datasets = load_envs(args.datasets) # Load Minari datasets and corresponding Gym environments
     tasks = []
-    for env, dataset in zip(envs, datasets):
+    # add control datasets and env
+    envs, control_datasets = load_envs(args.control_datasets) # Load Minari datasets and corresponding Gym environments
+    for env, dataset in zip(envs, control_datasets):
         task = ControlTask(
-            env.unwrapped.spec.id, 
-            env, 
+            TaskTypeEnum.CONTROL.value,
+            env.unwrapped.spec.id,
+            env,
             dataset,
             args = args,
             context_len = args.sequence_length,
@@ -43,6 +47,13 @@ def main(args):
             top_k_prompting = args.top_k
         )
         tasks.append(task)
+    
+    if len(args.text_datasets) > 0:
+        # add text datasets
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+    else:
+        assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
+
     model = GatoPolicy(
         device=args.device,
         embed_dim=args.embed_dim,
@@ -61,6 +72,7 @@ def main(args):
         activation_fn=args.activation_fn,
         pretrained_lm=args.pretrained_lm,
         flash=args.flash,
+        tokenizer_model_name=args.tokenizer_model_name,
         pad_seq=args.pad_seq,
     )
     args.embed_dim = model.embed_dim
@@ -148,13 +160,14 @@ if __name__ == '__main__':
     parser.add_argument('--disable_inner_pos_encoding', action='store_true', default=False)
 
     parser.add_argument('--mu','-mu', type=int, default=100) # mu-law encoding
-    parser.add_argument('--M', '-M', type=int, default=256) 
+    parser.add_argument('--M', '-M', type=int, default=256)
 
     #parser.add_argument('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
     parser.add_argument('--continuous_tokens', type=int, default=1024) # number of tokens for continuous values (e.g. actions, observations)
     parser.add_argument('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
 
     # transformer architecture hyperparameters
+    parser.add_argument('--tokenizer_model_name', type=str, default='gpt2')
     parser.add_argument('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
     parser.add_argument('--flash', default=False, action='store_true') # enable flash attention
     parser.add_argument('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
@@ -172,6 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--lora_dropout', type=float, default=0.1)
 
     # training hyperparameters
+    parser.add_argument('--text_prop', type=float, default=0.5) # proportion of text data in batch
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
@@ -187,7 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_steps', type=int, default=15000)
     parser.add_argument('--init_lr', type=float, default=1e-7) # starting LR for warmup
     parser.add_argument('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR after warmup
-    
+
     parser.add_argument('--min_factor', type=float, default=10.0) # the minimum LR factor, e.g. w/ 10, base 1e-4 -> 1e-5 for Cosine Decay
     parser.add_argument('--disable_cosine_decay', action='store_true', default=False) # disable cosine decay
 
@@ -201,10 +215,13 @@ if __name__ == '__main__':
     parser.add_argument('--eval_episodes', type=int, default=10)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--promptless_eval', action='store_true', default=False)
+    parser.add_argument('--eval_text_num_examples', type=int, default=100)
+    parser.add_argument('--eval_text_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
     parser.add_argument('--max_eval_len', type=int, default=None) # default unbounded
 
     # datasets / envs
-    parser.add_argument('--datasets', type=str, nargs='+', default=['d4rl_halfcheetah-expert-v2'])
+    parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
@@ -220,7 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_model', action='store_true', default=False)
     parser.add_argument('--save_mode', type=str, default='last', choices=['checkpoint', 'last']) # Checkpoit saves model every after each log_eval_freq steps
     parser.add_argument('--save_dir', type=str, default='models')
-    
+
     args = parser.parse_args()
     args = DotDict(vars(args))
 

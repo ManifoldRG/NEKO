@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from gato.utils.utils import save_model
+from gato.tasks.task import TaskTypeEnum
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
@@ -42,7 +43,7 @@ class Trainer:
 
         self.steps = 0
         self.start_time = None
-    
+
     def train(self):
         self.start_time = time.time()
         iters = self.args.training_steps // self.args.log_eval_freq
@@ -50,7 +51,7 @@ class Trainer:
             logs = self.train_iteration(self.args.log_eval_freq, i)
             if self.args.use_wandb and self.accelerator.is_main_process:
                 wandb.log(logs)
-        
+
         ## Save model at end of training only if not saving checkpoints
         if self.args.save_model and self.args.save_mode == 'last':
             self.accelerator.wait_for_everyone()
@@ -58,7 +59,7 @@ class Trainer:
                 unwrapped_model = self.accelerator.unwrap_model(self.model)
                 save_model(unwrapped_model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
 
-    
+
     def train_iteration(self, num_steps, iter):
         logs = {}
 
@@ -71,7 +72,7 @@ class Trainer:
             self.steps += 1
             train_loss, step_logs = self.train_step()
             train_losses.append(train_loss)
-        
+
         # add logs from last train_step as well
         for log in step_logs:
             logs[log] = step_logs[log]
@@ -80,15 +81,21 @@ class Trainer:
 
         eval_start = time.time()
         self.model.eval()
-        
+
         # loop over eval for each env
         with torch.no_grad():
             for task in self.tasks:
                 eval_logs = {}
-                if self.args.eval_episodes > 0 :
-                    eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
-                for k, v in eval_logs.items():
-                    logs[f'evaluation/{task.name}/{k}'] = v
+                if task.task_type == TaskTypeEnum.CONTROL.value:
+                    if self.args.eval_episodes > 0 :
+                        eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
+                    for k, v in eval_logs.items():
+                        logs[f'evaluation/{task.name}/{k}'] = v
+                elif task.task_type == TaskTypeEnum.TEXT.value:
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
+                    for k, v in eval_logs.items():
+                        logs[f'evaluation/text/{k}'] = v
+                    pass
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
@@ -101,7 +108,8 @@ class Trainer:
                 print(f'Iteration {iter}')
                 for k, v in logs.items():
                     print(f'{k}: {v}')
-        
+                print('=' * 80)
+
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':
             self.accelerator.wait_for_everyone()
@@ -116,26 +124,49 @@ class Trainer:
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
         # Build training batch
         start_time = time.time()
-        batch_dicts = self.sample_control_batch(self.args.batch_size)
+
+        # Calculate text and control batch sizes based on text_prop
+        text_batch_size = int(self.args.text_prop * self.args.batch_size)
+        control_batch_size = self.args.batch_size - text_batch_size
+        text_batch_dicts = []
+        control_batch_dicts = []
+
+        # Sample text and control batches
+        if text_batch_size > 0:
+            text_batch_dicts = self.sample_text_batch(text_batch_size)
+        if control_batch_size > 0:
+            control_batch_dicts = self.sample_control_batch(control_batch_size)
+
+        # Combine the batches
+        combined_batch_dicts = text_batch_dicts + control_batch_dicts
+
         logs['time/sample_batch'] = time.time() - start_time
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
-            logits, loss = self.model.forward(inputs = batch_dicts, compute_loss=True)
+            logits, loss = self.model.forward(inputs = combined_batch_dicts, compute_loss=True)
             self.accelerator.backward(loss)
 
             if not self.args.disable_grad_clip and self.accelerator.sync_gradients:
                 self.accelerator.clip_grad_norm_(self.model.parameters(), self.args.grad_norm_clip)
-            
+
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
         return loss.detach().cpu().item(), logs
 
+    def sample_text_batch(self, batch_size):
+        batch_dicts = []
+        text_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.TEXT.value]
+        for i,task in enumerate (text_tasks):
+            batch_dicts.extend(task.sample_batch(batch_size))
+        return batch_dicts
+
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
         sampled_task_indices = []
-        n_tasks = len(self.tasks)
+        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL.value]
+        n_tasks = len(control_tasks)
         while len(sampled_task_indices) < batch_size:
             max_n = min(n_tasks, batch_size - len(sampled_task_indices))
             new_tasks = np.random.choice(np.arange(n_tasks), size=max_n, replace=False).tolist()
@@ -150,7 +181,7 @@ class Trainer:
         uniform_indices = [i for i in prompt_indices if i not in end_indices]
 
         # aggregate acrosss tasks sampled multiple times
-        for i, task in enumerate(self.tasks):
+        for i, task in enumerate(control_tasks):
             total_task_batch_size = 0
             task_vanilla_batch_size = 0
             task_prompted_batch_sizes = {}
