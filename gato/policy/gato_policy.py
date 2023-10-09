@@ -82,7 +82,11 @@ class GatoPolicy(nn.Module):
                 config=config,
             )
             embed_dim = config.n_embd
-            self.embed_token = self.transformer.wte
+            #self.embed_token = self.transformer.wte
+            assert self.transformer.wte.weight.shape[0] == self.text_tokens, "pretrained token/expected mimsatch" # potentially make text_tokens dynamic
+            # expand embedding dictionary up to vocab_size
+            self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
+            self.embed_token.weight.data[:self.text_tokens] = self.transformer.wte.weight.data
         else:
             gate = False
             if activation_fn == 'geglu':
