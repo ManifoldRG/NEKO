@@ -117,18 +117,23 @@ class Trainer:
         logs['training/learning_rate'] = self.scheduler.get_lr()[0] # store LR at current step
         # Build training batch
         start_time = time.time()
-        logs['time/sample_batch'] = time.time() - start_time
 
         # Calculate text and control batch sizes based on text_prop
         text_batch_size = int(self.args.text_prop * self.args.batch_size)
         control_batch_size = self.args.batch_size - text_batch_size
-        
+        text_batch_dicts = []
+        control_batch_dicts = []
+
         # Sample text and control batches
-        text_batch_dicts = self.sample_text_batch(text_batch_size)
-        control_batch_dicts = self.sample_control_batch(control_batch_size)
-        
+        if text_batch_size > 0:
+            text_batch_dicts = self.sample_text_batch(text_batch_size)
+        if control_batch_size > 0:
+            control_batch_dicts = self.sample_control_batch(control_batch_size)
+
         # Combine the batches
         combined_batch_dicts = text_batch_dicts + control_batch_dicts
+        
+        logs['time/sample_batch'] = time.time() - start_time
 
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
@@ -169,7 +174,6 @@ class Trainer:
         end_indices = np.random.choice(prompt_indices, size=round(len(prompt_indices) / 2), replace=False).tolist()
         uniform_indices = [i for i in prompt_indices if i not in end_indices]
 
-
         # aggregate acrosss tasks sampled multiple times
         for i, task in enumerate(control_tasks):
             total_task_batch_size = 0
@@ -187,4 +191,5 @@ class Trainer:
             # sample episodes from dataset
             if total_task_batch_size > 0:
                 task_episode_dicts = task.sample_batch(task_vanilla_batch_size, task_prompted_batch_sizes, self.device, max_tokens=self.args.sequence_length)
+                batch_dicts.extend(task_episode_dicts)
         return batch_dicts

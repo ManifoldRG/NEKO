@@ -47,8 +47,11 @@ def main(args):
         )
         tasks.append(task)
     
-    # add text datasets
-    tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+    if len(args.text_datasets) > 0:
+        # add text datasets
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+    else:
+        assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 
     model = GatoPolicy(
         device=args.device,
@@ -216,7 +219,7 @@ if __name__ == '__main__':
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
-    parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-2-v1'])
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted

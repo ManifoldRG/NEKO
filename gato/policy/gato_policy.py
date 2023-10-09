@@ -144,7 +144,6 @@ class GatoPolicy(nn.Module):
         self.pos_embed_observation = nn.Embedding(context_len, embed_dim)
 
 
-
     # predicts next token (for each input token)
     def forward(self, inputs: list = None, compute_loss=False, **kwargs):
         # tokenize inputs
