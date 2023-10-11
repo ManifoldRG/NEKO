@@ -140,7 +140,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    #mp.set_start_method('spawn')
+    mp.set_start_method('spawn')
 
     parser = argparse.ArgumentParser()
 

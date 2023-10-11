@@ -45,9 +45,10 @@ class Trainer:
                 prompt_ep_proportion=args.prompt_ep_proportion,
                 tasks=min_tasks,
             )
-            self.control_sampler = RandomSampler(self.control_ds, replacement=True, num_samples=self.control_batch_size)
-            n_workers = os.cpu_count()
-            n_workers = 0
+            #self.control_sampler = RandomSampler(self.control_ds, replacement=True, num_samples=self.control_batch_size)
+            self.control_sampler = RandomSampler(self.control_ds, replacement=True, num_samples=self.control_batch_size * args.training_steps)
+            #n_workers = os.cpu_count()
+            n_workers = 4
             collate_fn = partial(collate_control, model.device)
             self.control_dl =  DataLoader(
                 self.control_ds, 
@@ -55,7 +56,10 @@ class Trainer:
                 batch_size=self.control_batch_size, 
                 collate_fn=collate_fn, 
                 num_workers=n_workers, 
+                persistent_workers=True,
+                prefetch_factor=2
             )
+            self.control_dl = iter(self.control_dl)
         else:
             self.control_ds = None
             self.control_dl = None
@@ -193,9 +197,9 @@ class Trainer:
 
     def sample_control_batch(self, batch_size):
         batch_dicts = []
-
-        if False:
-            batch_dicts = [batch_dict for batch_dict in self.control_dl][0]
+        new_sampling = True
+        if new_sampling:
+            batch_dicts = next(self.control_dl)
             for i in range(len(batch_dicts)):
                 for k, v in batch_dicts[i].items():
                     if v is not None:

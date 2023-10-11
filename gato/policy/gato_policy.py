@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from einops import rearrange
+import time
 
 import gymnasium as gym
 import transformers
@@ -166,7 +167,6 @@ class GatoPolicy(nn.Module):
 
         # predict logits
         logits = self.predict_token(final_representations)
-
         if compute_loss:
             # obtain target tokens, and pad
             loss_logits = logits[:, :-1, :]
@@ -184,7 +184,6 @@ class GatoPolicy(nn.Module):
                 import pdb; pdb.set_trace()
         else:
             loss = None
-
         return logits, loss
 
 
