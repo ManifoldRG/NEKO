@@ -62,7 +62,8 @@ class Trainer:
                 collate_fn=collate_fn, 
                 num_workers=n_workers, 
                 persistent_workers=True,
-                prefetch_factor=prefetch_factor
+                prefetch_factor=prefetch_factor,
+                #pin_memory=True
             )
             self.control_dl = iter(self.control_dl)
         else:
