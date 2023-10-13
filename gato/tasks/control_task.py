@@ -115,6 +115,7 @@ class ControlTask(Task):
         ep_lens = []
         metrics = {}
         max_len = self.args.max_eval_len
+        model.pad_seq = True
 
         context_timesteps = model.context_len // self.tokens_per_timestep # amount of timesteps that fit into context
 
@@ -133,7 +134,10 @@ class ControlTask(Task):
             ep_return = 0
             ep_clipped_return = 0
             ep_len = 0
+            past_key_values = None
+            t = 0
             while not done:
+                t += 1
                 new_obs = torch.tensor(observation, device=model.device).unsqueeze(0)
                 if self.image_transform is not None:
                     new_obs = self.image_transform.transform(new_obs)
@@ -150,7 +154,11 @@ class ControlTask(Task):
                 # trim to context length
                 input_dict[self.obs_str] = input_dict[self.obs_str][-context_timesteps:,]
                 input_dict[self.action_str] = input_dict[self.action_str][-context_timesteps:,]
-                action = model.predict_control(input_dict, task=self, deterministic=deterministic)
+
+                # action = model.predict_control(input_dict, task=self, deterministic=deterministic)
+                action, past_key_values= model.predict_control(input_dict, task=self, current_timestep=t, deterministic=deterministic, past_key_values=past_key_values)
+
+
                 input_dict[self.action_str][-1,] = action
                 np_action = action.cpu().numpy()
                 observation, reward, terminated, truncated, info = self.env.step(np_action)

@@ -150,7 +150,7 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs: list = None, compute_loss=False, **kwargs):
+    def forward(self, inputs: list = None, compute_loss=False, use_cache=False, past_key_values=None, **kwargs):
         # tokenize inputs
         if inputs is not None:
             token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
@@ -163,7 +163,14 @@ class GatoPolicy(nn.Module):
 
         # pass to transformer
         #final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
-        final_representations = self.transformer(inputs_embeds=token_embeddings, attention_mask=token_masks)['last_hidden_state']
+        #final_representations = self.transformer(inputs_embeds=token_embeddings, attention_mask=token_masks, past_key_values=past_key_values)['last_hidden_state']
+        transformer_output = self.transformer(inputs_embeds=token_embeddings, attention_mask=token_masks, past_key_values=past_key_values, use_cache=use_cache)
+        final_representations = transformer_output['last_hidden_state']
+        if use_cache:
+            past_key_values = list(transformer_output['past_key_values'])
+        else:
+            past_key_values = None
+
 
         # predict logits
         logits = self.predict_token(final_representations)
@@ -184,7 +191,7 @@ class GatoPolicy(nn.Module):
                 import pdb; pdb.set_trace()
         else:
             loss = None
-        return logits, loss
+        return logits, loss, past_key_values
 
 
     def tokenize_input_dicts(self, inputs: list):
@@ -403,10 +410,15 @@ class GatoPolicy(nn.Module):
             seq_len = token_embeddings.shape[1]
             pad_len = self.context_len - seq_len
             if pad_len > 0:
-                token_embeddings = torch.cat([token_embeddings, torch.zeros(batch_len, pad_len, self.embed_dim, device=self.device)], dim=1)
-                tokens = torch.cat([tokens, torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device)], dim=1)
-                token_target_masks = torch.cat([token_target_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
-                token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
+                # token_embeddings = torch.cat([token_embeddings, torch.zeros(batch_len, pad_len, self.embed_dim, device=self.device)], dim=1)
+                # tokens = torch.cat([tokens, torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device)], dim=1)
+                # token_target_masks = torch.cat([token_target_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
+                # token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
+                # left pad instead
+                token_embeddings = torch.cat([torch.zeros(batch_len, pad_len, self.embed_dim, device=self.device), token_embeddings], dim=1)
+                tokens = torch.cat([torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device), tokens], dim=1)
+                token_target_masks = torch.cat([torch.zeros(batch_len, pad_len, device=self.device), token_target_masks], dim=1)
+                token_masks = torch.cat([torch.zeros(batch_len, pad_len, device=self.device), token_masks], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
 
     def predict_text(self, input_text, max_length=20, deterministic=True):
@@ -458,10 +470,13 @@ class GatoPolicy(nn.Module):
 
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
-    def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
+    def predict_control(self, input: dict, task: ControlTask, current_timestep: int, deterministic: bool = True, past_key_values = None):
         """For a single control example, generate prediction (action)"""
 
         # expects that inputs['continuous_actions'] or inputs['discrete_actions'] are padded by 1 timestep
+        context_timesteps = self.context_len // task.tokens_per_timestep
+        #expected_tokens = task.tokens_per_timestep * (context_timesteps - 1)
+
 
         action_type = task.action_type # continuous or discrete
         action_tokens = task.action_tokens
@@ -480,17 +495,47 @@ class GatoPolicy(nn.Module):
             assert task.env.action_space.n <= self.discrete_tokens, "discrete action space too large for model"
             end_token = start_token + task.env.action_space.n - 1
         token_embeddings, _, _, token_masks = self.tokenize_input_dicts([input])
+        # remove padding tokens at start of seq
+        padding_tokens = self.context_len - context_timesteps * task.tokens_per_timestep
+        token_embeddings = token_embeddings[:, padding_tokens:, :]
+        token_masks = token_masks[:, padding_tokens:]
 
         # remove last action_tokens tokens, which are padding
 
         token_embeddings = token_embeddings[:, :-action_tokens, :]
         token_masks = token_masks[:, :-action_tokens]
+        
+        # remove additional timesteps if past_key_values is not None
+        past_mask = None
+        if past_key_values is not None:
+            assert context_timesteps > 1, "context_timesteps must be greater than 1 to use past_key_values"
+            expected_past_tokens = task.tokens_per_timestep * (context_timesteps - 1) - 1 # minus 1 for last action token
+            for i in range(len(past_key_values)):
+                past_key_values[i] = past_key_values[i][:, :, :, -expected_past_tokens:, :]
+                
+                #assert past_key_values.shape[1] == expected_tokens, "past_key_values has incorrect number of tokens"
+            if current_timestep >= context_timesteps:
+                past_mask = torch.ones((1, past_key_values[0].shape[-2]), device=self.device)
+            else:
+                past_mask = torch.zeros((1, past_key_values[0].shape[-2]), device=self.device)
+                past_mask[:, -(task.tokens_per_timestep * (current_timestep - 1) - 1):] = 1
+
+            token_embeddings = token_embeddings[:, -(1 + task.observation_tokens + 1):, :] # + 1 for separator, + 1 for action token
+            token_masks = token_masks[:, -(1 + task.observation_tokens + 1):]
+            expected_total = context_timesteps * task.tokens_per_timestep - action_tokens
+            assert token_masks.shape[1] == task.observation_tokens + 1 + 1, "token_masks has incorrect number of tokens"
+            assert token_embeddings.shape[1] + past_key_values[0].shape[-2] == expected_total, "incorrect number of tokens"
 
         predicted_tokens = []
 
         # predict tokens, sampling or deterministically picking best token
         for i in range(action_tokens):
-            logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+            if past_mask is not None:
+                full_mask = torch.cat([past_mask, token_masks], dim=1)
+            else:
+                full_mask = token_masks
+            logits, _, past_key_values = self.forward(token_embeddings=token_embeddings, token_masks=full_mask, token_target_masks=None, tokens=None, use_cache=True, past_key_values=past_key_values)
+            #import pdb; pdb.set_trace()
             # extract valid logits from last timestep
             logits = logits[0, -1, start_token:(end_token+1)]
             if deterministic:
@@ -506,8 +551,14 @@ class GatoPolicy(nn.Module):
             new_embedding = self.embed_token(token) # check shape of new_emebddingss
             token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
             # and trim to context len
-            token_embeddings = token_embeddings[:, -self.context_len:, :]
-            token_masks = token_masks[:, -self.context_len:]
+            # token_embeddings = token_embeddings[:, -self.context_len:, :]
+            # token_masks = token_masks[:, -self.context_len:]
+            token_embeddings = token_embeddings[:, -1:, :]
+            token_masks = token_masks[:, -1:]
+            if past_mask is not None:
+                past_mask = torch.cat([past_mask[:, 1:], torch.ones((1, 1), device=self.device)], dim=1)
+
+
             predicted_tokens.append(token)
 
         # convert tokens back to actions
@@ -517,7 +568,7 @@ class GatoPolicy(nn.Module):
             predicted_tokens = torch.stack(predicted_tokens, dim=0)
             action = self.continuous_action_tokenizer.decode(predicted_tokens)
 
-        return action
+        return action, past_key_values
 
 if __name__ == '__main__':
     model = GatoPolicy(
