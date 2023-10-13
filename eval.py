@@ -42,7 +42,8 @@ def main(args):
     env_args = {
         'render_mode': 'human' if args.render else None,
     }
-
+    if 'control_datasets' not in eval_args or eval_args.control_datasets is None: # handle legacy naming
+        eval_args.control_datasets = eval_args.datasets
     envs, datasets = load_envs(eval_args.control_datasets, env_args) # Load Minari datasets and corresponding Gym environments
 
     tasks = []
@@ -56,13 +57,14 @@ def main(args):
             args = eval_args,
             context_len=eval_args.sequence_length,
             training_prompt_len_proportion=eval_args.prompt_len_proportion,
-            share_prompt_episodes = not eval_args.unique_prompt_episodes,
+            # share_prompt_episodes = not eval_args.unique_prompt_episodes,
             top_k_prompting = args.top_k
         )
         env_names.append(env.unwrapped.spec.id)
         tasks.append(task)
     print('Evaluating on envs:', env_names)
-
+    if eval_args.textless_vocab is None:
+        eval_args.textless_vocab = True
     model = GatoPolicy(
         device=eval_args.device,
         embed_dim=eval_args.embed_dim,
@@ -81,7 +83,8 @@ def main(args):
         activation_fn=eval_args.activation_fn,
         pretrained_lm=eval_args.pretrained_lm,
         flash=eval_args.flash,
-        flash_layers=eval_args.flash_layers,
+        textless_vocab=eval_args.textless_vocab,
+        # flash_layers=eval_args.flash_layers,
     )
     if eval_args.get('lora', False):
         assert eval_args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
