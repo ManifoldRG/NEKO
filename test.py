@@ -30,7 +30,8 @@ with h5py.File(dataset_path, 'r') as original_file:
                     name,
                     data=obj[()],
                     compression='gzip',  # specify the compression type here
-                    compression_opts=9   # specify the compression level here
+                    #compression_opts=9   # specify the compression level here
+                    compression_opts=1
                 )
                 # Copy attributes of a group/dataset
                 for attr_name, attr_value in obj.attrs.items():
@@ -77,11 +78,11 @@ def benchmark_reads(file_path, episodes=None, n_episodes=10):
             print(observations.shape)
 
 # old test
-n_episodes = 100
+n_episodes = 10
 episodes = np.random.randint(0,200,size=n_episodes)
 benchmark_reads(dataset_path, episodes)
 benchmark_reads(compressed_path, episodes)
-
+import pdb; pdb.set_trace()
 
 # lets try now using dataset
 dataset = minari.load_dataset(dataset_name)
