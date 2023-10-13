@@ -16,6 +16,7 @@ import transformers
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
+from gato.policy.orig_policy import GatoPolicy as OrigGatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
@@ -56,8 +57,11 @@ def main(args):
         tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
-
-    model = GatoPolicy(
+    model_class = GatoPolicy
+    debug = False
+    if debug:
+        model_class = OrigGatoPolicy
+    model = model_class(
         device=args.device,
         embed_dim=args.embed_dim,
         layers=args.layers,

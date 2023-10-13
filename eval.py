@@ -12,6 +12,7 @@ from accelerate import Accelerator
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
+from gato.policy.orig_policy import GatoPolicy as OrigGatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
 from gato.tasks.control_task import ControlTask
@@ -65,7 +66,11 @@ def main(args):
     print('Evaluating on envs:', env_names)
     if eval_args.textless_vocab is None:
         eval_args.textless_vocab = True
-    model = GatoPolicy(
+    model_class = GatoPolicy
+    debug = False
+    if debug:
+        model_class = OrigGatoPolicy
+    model = model_class(
         device=eval_args.device,
         embed_dim=eval_args.embed_dim,
         layers=eval_args.layers,
