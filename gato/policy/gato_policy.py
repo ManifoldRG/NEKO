@@ -403,10 +403,15 @@ class GatoPolicy(nn.Module):
             seq_len = token_embeddings.shape[1]
             pad_len = self.context_len - seq_len
             if pad_len > 0:
-                token_embeddings = torch.cat([token_embeddings, torch.zeros(batch_len, pad_len, self.embed_dim, device=self.device)], dim=1)
-                tokens = torch.cat([tokens, torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device)], dim=1)
-                token_target_masks = torch.cat([token_target_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
-                token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
+                # token_embeddings = torch.cat([token_embeddings, torch.zeros(batch_len, pad_len, self.embed_dim, device=self.device)], dim=1)
+                # tokens = torch.cat([tokens, torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device)], dim=1)
+                # token_target_masks = torch.cat([token_target_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
+                # token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
+                # left pad instead
+                token_embeddings = torch.cat([torch.zeros(batch_len, pad_len, self.embed_dim, device=self.device), token_embeddings], dim=1)
+                tokens = torch.cat([torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device), tokens], dim=1)
+                token_target_masks = torch.cat([torch.zeros(batch_len, pad_len, device=self.device), token_target_masks], dim=1)
+                token_masks = torch.cat([torch.zeros(batch_len, pad_len, device=self.device), token_masks], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
 
     def predict_text(self, input_text, max_length=20, deterministic=True):
