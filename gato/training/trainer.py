@@ -49,11 +49,8 @@ class Trainer:
             self.control_sampler = RandomSampler(self.control_ds, replacement=True, num_samples=self.control_batch_size * args.training_steps)
             #n_workers = os.cpu_count()
             n_workers = 4
-            #n_workers = 6
             #n_workers = 8
             prefetch_factor = 2
-            #prefetch_factor = 1
-            #prefetch_factor = 4
             collate_fn = partial(collate_control, model.device)
             self.control_dl =  DataLoader(
                 self.control_ds, 

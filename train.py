@@ -229,6 +229,7 @@ if __name__ == '__main__':
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
+    parser.add_argument('--compressed_control', default=False, action='store_true', help='use pre-compressed control datasets')
     parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
 
     # params for sampling from datasets

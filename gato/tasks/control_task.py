@@ -77,6 +77,7 @@ class ControlTask(Task):
 
         self.tokens_per_timestep =  self.action_tokens + self.observation_tokens + 1 # additional separator token
         assert context_len >= self.tokens_per_timestep, f'Context length must be at least {self.tokens_per_timestep} for env {env_name}'
+        print(env_name, "t", context_len // self.tokens_per_timestep)
 
         # If sampled episode needs a prompt, this specifies what proportion of tokens should be from the prompt
         self.training_prompt_len_proportion = training_prompt_len_proportion 
@@ -108,6 +109,9 @@ class ControlTask(Task):
             with h5py.File(self.dataset.spec.data_path, 'r') as f:
                 self.episode_lengths.append(f[f'episode_{i}']['rewards'].shape[0])
             prev_index = i
+
+        # Whether to sample from compressed versions
+        self.compressed = args.compressed_control
     def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []
@@ -300,7 +304,10 @@ class ControlTask(Task):
             'actions': [],
             'observations': [],
         }
-        with h5py.File(self.dataset.spec.data_path, 'r') as f:
+        data_path = self.dataset.spec.data_path
+        if self.compressed:
+            data_path = data_path.replace('v0', 'v0-compressed')
+        with h5py.File(data_path, 'r') as f:
             # iterate over episodes
             for i, episode_index in enumerate(episode_indices):
                 ep_group = f[f"episode_{episode_index}"]

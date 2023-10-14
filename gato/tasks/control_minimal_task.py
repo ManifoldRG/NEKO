@@ -39,8 +39,9 @@ class ControlMinimalTask:
         self.image_transform = task.image_transform
         self.training_prompt_len_proportion = task.training_prompt_len_proportion
         self.data_path = task.dataset.spec.data_path
-        #self.get_episodes_sliced = task.get_episodes_sliced
-
+        self.compressed = task.compressed
+        if self.compressed:
+            self.data_path = self.data_path.replace('v0', 'v0-compressed')
     def sample_batch_configurable(
             self, batch_size: int, 
             device: str, 
