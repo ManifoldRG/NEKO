@@ -129,7 +129,7 @@ class Trainer:
         # Sample text and control batches
         if text_batch_size > 0:
             text_batch_dicts = self.sample_text_batch(text_batch_size)
-        if caption_batch_size > 0
+        if caption_batch_size > 0:
             caption_batch_dicts = self.sample_caption_batch(caption_batch_size)
         if control_batch_size > 0:
             control_batch_dicts = self.sample_control_batch(control_batch_size)
