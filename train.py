@@ -48,8 +48,11 @@ def main(args):
         )
         tasks.append(task)
     
-    # add text datasets
-    tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+    if len(args.text_datasets) > 0:
+        # add text datasets
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+    else:
+        assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 
     # add caption datasets
     tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, split = 0.1))    

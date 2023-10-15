@@ -70,15 +70,6 @@ class GatoPolicy(nn.Module):
         }
 
 
-        # self.transformer = HFGPT(
-        #     n_embd=embed_dim,
-        #     n_layer=layers,
-        #     n_head=heads,
-        #     dropout=dropout,
-        #     vocab_size=self.vocab_size,
-        #     n_positions=context_len,
-        #     activation_fn=activation_fn,
-        # )
         if pretrained_lm is not None:
             print(f'loading pretrained GPT2 weights')
             config = transformers.GPT2Config.from_pretrained(pretrained_lm)
@@ -91,7 +82,11 @@ class GatoPolicy(nn.Module):
                 config=config,
             )
             embed_dim = config.n_embd
-            self.embed_token = self.transformer.wte
+            #self.embed_token = self.transformer.wte
+            assert self.transformer.wte.weight.shape[0] == self.text_tokens, "pretrained token/expected mimsatch" # potentially make text_tokens dynamic
+            # expand embedding dictionary up to vocab_size
+            self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
+            self.embed_token.weight.data[:self.text_tokens] = self.transformer.wte.weight.data
         else:
             gate = False
             if activation_fn == 'geglu':
@@ -147,7 +142,6 @@ class GatoPolicy(nn.Module):
         ## Inner-timestep Embeddings
         self.use_pos_encoding = use_pos_encoding
         self.pos_embed_observation = nn.Embedding(context_len, embed_dim)
-
 
 
     # predicts next token (for each input token)
@@ -260,6 +254,7 @@ class GatoPolicy(nn.Module):
             # tokenize text
             if 'text' in batch and batch['text'] is not None:
                 text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
+                text_tokens = text_tokens.to(self.device)
                 text_tokens = text_tokens.long()
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets_masks = torch.ones_like(text_tokens)
@@ -378,7 +373,7 @@ class GatoPolicy(nn.Module):
                 action_embeddings = torch.cat(action_embeddings, dim=1)
             else:
                 # Create empty action embeddings
-                action_embeddings = torch.zeros(batch_embeddings.shape[0], 0, self.embed_dim) 
+                action_embeddings = torch.zeros(batch_embeddings.shape[0], 0, self.embed_dim).to(self.device)
             batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
             tokens_per_timestep = batch_embeddings.shape[1] # number of tokens per timestep
             total_tokens = n_timesteps * tokens_per_timestep
@@ -409,7 +404,6 @@ class GatoPolicy(nn.Module):
         tokens = torch.cat(tokens, dim=0)
         token_target_masks = torch.cat(token_target_masks, dim=0)
         token_masks = torch.cat(token_masks, dim=0)
-
         if self.pad_seq:
             # get seq length
             seq_len = token_embeddings.shape[1]
