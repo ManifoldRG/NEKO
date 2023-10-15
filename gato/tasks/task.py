@@ -5,6 +5,7 @@ from enum import Enum
 class TaskTypeEnum(Enum):
     CONTROL = "control"
     TEXT = "text"
+    CAPTION = "caption"
     # add more as we add more modalities
 
 class Task(ABC):

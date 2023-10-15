@@ -18,6 +18,7 @@ from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
+from gato.tasks.caption_task import CaptionTask
 from gato.tasks.task import TaskTypeEnum
 
 
@@ -49,6 +50,9 @@ def main(args):
     
     # add text datasets
     tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+
+    # add caption datasets
+    tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, split = 0.1))    
 
     model = GatoPolicy(
         device=args.device,
@@ -182,6 +186,7 @@ if __name__ == '__main__':
 
     # training hyperparameters
     parser.add_argument('--text_prop', type=float, default=0.5) # proportion of text data in batch
+    parser.add_argument('--caption_prop', type=float, default=0.1) # proportion of image caption data in batch
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
@@ -217,6 +222,7 @@ if __name__ == '__main__':
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
     parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-2-v1'])
+    parser.add_argument('--caption_datasets', type=str, nargs='+', default=[])
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted

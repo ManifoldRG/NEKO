@@ -121,10 +121,12 @@ class Trainer:
 
         # Calculate text and control batch sizes based on text_prop
         text_batch_size = int(self.args.text_prop * self.args.batch_size)
-        control_batch_size = self.args.batch_size - text_batch_size
+        caption_batch_size = int(self.args.caption_prop * self.args.batch_size)
+        control_batch_size = self.args.batch_size - text_batch_size - caption_batch_size
         
         # Sample text and control batches
         text_batch_dicts = self.sample_text_batch(text_batch_size)
+        caption_batch_dicts = self.sample_caption_batch(caption_batch_size)
         control_batch_dicts = self.sample_control_batch(control_batch_size)
         
         # Combine the batches
@@ -150,6 +152,13 @@ class Trainer:
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
 
+    def sample_caption_batch(self, batch_size):
+        batch_dicts = []
+        caption_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CAPTION.value]
+        for i,task in enumerate (caption_tasks):
+            batch_dicts.extend(task.sample_batch(batch_size))
+        return batch_dicts
+    
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
