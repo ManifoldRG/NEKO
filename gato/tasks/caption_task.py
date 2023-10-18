@@ -55,7 +55,7 @@ class CaptionTask(Task):
     
             # Need to add a new dimension to (3, 256, 256) so it becomes (1, 3, 256, 256) where the added dummy dimension at dim 0 is the num_images. 
             # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
-            item['images'] = img_data[np.newaxis, :]
+            item['images'] = torch.tensor(img_data[np.newaxis, :])
             #print(item['images'].shape)
             item['text'] = bundle['txt'][0].decode('utf-8')
             all_data.append(item)
@@ -127,7 +127,7 @@ class CaptionTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directory with youe data directory
-    task = CaptionTask(task_type = 'caption', dataset_directories = ['/home/<user_name>/Git/NEKO/Train_GCC-training-small'], split = 0.1)
+    task = CaptionTask(task_type = 'caption', dataset_directories = ['/home/<user_name>/Git/NEKO/your_data_path'], split = 0.1)
     #print(task.dataset["train"][4]["images"][0][1][10])
     #print(task.dataset["train"][4]["images"][0][2][15])
     #print(task.dataset["train"][4]["text"])
