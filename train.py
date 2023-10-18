@@ -54,8 +54,13 @@ def main(args):
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 
-    # add caption datasets
-    tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, split = 0.1))    
+ 
+    if len(args.caption_datasets) > 0:
+        # add caption datasets
+        tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, split = 0.1))
+    else:
+        assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
+
 
     model = GatoPolicy(
         device=args.device,
@@ -188,8 +193,8 @@ if __name__ == '__main__':
     parser.add_argument('--lora_dropout', type=float, default=0.1)
 
     # training hyperparameters
-    parser.add_argument('--text_prop', type=float, default=0.5) # proportion of text data in batch
-    parser.add_argument('--caption_prop', type=float, default=0.1) # proportion of image caption data in batch
+    parser.add_argument('--text_prop', type=float, default=0) # proportion of text data in batch
+    parser.add_argument('--caption_prop', type=float, default=0) # proportion of image caption data in batch
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
@@ -224,7 +229,7 @@ if __name__ == '__main__':
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
-    parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-2-v1'])
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
     parser.add_argument('--caption_datasets', type=str, nargs='+', default=[])
 
     # params for sampling from datasets
