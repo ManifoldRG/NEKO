@@ -266,7 +266,7 @@ class GatoPolicy(nn.Module):
             if 'images' in batch and batch['images'] is not None or 'image_embeddings' in batch and batch['image_embeddings'] is not None:
                 # Only one of the two should hold, 'image_embeddings' is used during evaluation of caption task to avoid re-calculating embedding for the same image every time
                 if 'images' in batch and batch['images'] is not None:
-                    image_embeddings = self.image_embedding(batch['images']) # n_timesteps x n_patches x embed_dim
+                    image_embeddings = self.image_embedding(batch['images'].to(self.device)) # n_timesteps x n_patches x embed_dim
                 if 'image_embeddings' in batch and batch['image_embeddings'] is not None:
                     image_embeddings = batch['image_embeddings']
                 n_images = image_embeddings.shape[0]
@@ -466,7 +466,7 @@ class GatoPolicy(nn.Module):
         image is in the format of 1 x 3 x H x W, where 1 is the num_images, 3 is the 3 RGB channels, default value for H and W is 256
         max_length is the max length of caption to be generated, will cut off at max_length
         """
-        image_embeddings = self.image_embedding(image) # the image embedding that will be uesedto generate caption
+        image_embeddings = self.image_embedding(image).to(self.device) # the image embedding that will be uesedto generate caption
         n_images = image_embeddings.shape[0]
         n_patches = image_embeddings.shape[1] 
         assert n_images == 1, "number of images should always be 1 for predicting caption"
