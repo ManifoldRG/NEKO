@@ -89,6 +89,11 @@ class Trainer:
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
                     pass
+                elif task.task_type == TaskTypeEnum.CAPTION.value:
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_caption_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_caption_log_examples)
+                    for k, v in eval_logs.items():
+                        logs[f'evaluation/caption/{k}'] = v
+
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start

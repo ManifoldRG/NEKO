@@ -57,7 +57,7 @@ def main(args):
  
     if len(args.caption_datasets) > 0:
         # add caption datasets
-        tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, split = 0.1))
+        tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, args.test_data_prop))
     else:
         assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
 
@@ -231,6 +231,10 @@ if __name__ == '__main__':
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
     parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
     parser.add_argument('--caption_datasets', type=str, nargs='+', default=[])
+    parser.add_argument('--test_data_prop', type=str, nargs='+', default=0.1) # this is for image caption task only, the proportion of test data out of all of the data
+    parser.add_argument('--eval_caption_num_examples', type=int, default=100)
+    parser.add_argument('--eval_caption_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
+
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted

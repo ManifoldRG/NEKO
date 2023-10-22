@@ -14,9 +14,11 @@ import math
 import torch
 from torch.nn import functional as F
 from torch import nn
+import json
+import random
 
 class CaptionTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, caption_datasets, split):
+    def __init__(self, task_type: TaskTypeEnum, caption_datasets, test_data_prop = 0.1, test_data_mask_file = None):
         """
         task_type should be CAPTION
         caption_datasets is a list of diretories, with each directory in the format of something similar to 
@@ -24,7 +26,13 @@ class CaptionTask(Task):
         multiple .tar files downloaded with img2dataset. Each tar file contains multiple bundles, with each bundle 
         containing one .jpg, one txt and one json file. The .jpg and the txt file (the caption) are extracted and 
         placed into the data structures to be used for training and evaluation. 
-        split is a percentage of data for test data, and 1-split is the percentage of training data. 
+        test_data_prop is a percentage of data for test data, and 1-test_data_prop is the percentage of training data.
+        test_data_mask_file is a file containing a mask for the indices of test data in the dataset processed 
+        during training phase when the dataset is separated into a trating set and and a test set 
+        And this mask keeps track of the indices of test data in the dataset. When it is not None, that indicates 
+        evalaution phase, and test data needs to be constructed accoring to the mask, and be used for evalaution.
+        If test_data_mask_file is None, that indicates evalaution phase, and we need to split data into training
+        and test data, and save the test data mask into a file to bse used to construct test data during evaluation phase
         """
         super().__init__(task_type)
         self.dataset = {}
@@ -44,7 +52,7 @@ class CaptionTask(Task):
             item = {}
             img = Image.open(io.BytesIO(bundle['jpg'][0])) # bundle['jpg'] is a list of length 1
             img_data = np.asarray(img)
-            # Through testing of processing multiple .tar files, we have figured out that we neeed "try except" in the following 
+            # Through testing of processing multiple .tar files, we have figured out that we need "try except" in the following 
             # because sometimes the img_data is only (256, 256) insetad of (256, 256,3) (assuming all image sizes are 256x256)
             # and transpose will raise an error and everything grinds to a halt. It is perhaps a bug in the "img2dataset" unitlity we
             # used to downlaod datasets into tar files. When such error occurs, we just ignore the current bundle and move to the next one
@@ -55,18 +63,28 @@ class CaptionTask(Task):
     
             # Need to add a new dimension to (3, 256, 256) so it becomes (1, 3, 256, 256) where the added dummy dimension at dim 0 is the num_images. 
             # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
-            item['images'] = torch.tensor(img_data[np.newaxis, :])
-            #print(item['images'].shape)
+            item['image'] = torch.tensor(img_data[np.newaxis, :])
             item['text'] = bundle['txt'][0].decode('utf-8')
             all_data.append(item)
 
-        # Do we need the shuffle? It depends on whether the data sources is already randly shuffled, perhaps do it anyway. 
-        # This is an O(n) algorithm timewise, will see how much it impacts the performance
-        np.random.shuffle(all_data)
-        split_index = math.ceil(len(all_data)*(1-split))
-        self.dataset['train'] = all_data[:split_index]
-        self.dataset['test'] = all_data[split_index:]
+        #test_data_mask_file is a .json file, this is evalaution phase, need to construct test data according to mask
+        if test_data_mask_file is not None: 
+            with open(test_data_mask_file, 'r') as f:
+                test_data_mask = json.load(f) # this should be a list on int
+                assert len(test_data_mask) == len(all_data), "len(test_data_mask) must be equal to len(all_data)" 
+                self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
 
+        else: # this is training phase, separate data into training and test data
+            test_data_len = math.ceil(len(all_data)*test_data_prop)
+            test_data_mask = [0]*len(all_data)
+            test_data_indices = [random.randint(0, len(all_data)-1) for _ in range(test_data_len)]
+            for index in test_data_indices:
+                test_data_mask[index] = 1 # set the mask of test data item to 1, then training data are the element with mask 0
+            self.dataset['train'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 0]
+            self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
+
+            with open('test_data_mask.json', 'w') as f:
+                json.dump(test_data_mask, f)
 
     def sample_batch(self, batch_size):
         random_indices = np.random.randint(0, len(self.dataset['train']), size=batch_size)
@@ -76,7 +94,7 @@ class CaptionTask(Task):
         batch_dicts = []
         for item in selected_examples:
             batch_dict = {
-                'images': item['images'],
+                'images': item['image'],
                 'text': item['text']
             }
             batch_dicts.append(batch_dict)
@@ -100,15 +118,14 @@ class CaptionTask(Task):
         for idx in range(num_examples_to_test):
             image = self.dataset['test'][idx]['image']
             target_caption = self.dataset['test'][idx]['text']
-     
+            target_tokens = tokenizer.encode(target_caption)
             # Generate prediction
-            pred_logits, pred_caption = model.predict_caption(image, deterministic=deterministic)
+            pred_logits, pred_caption = model.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
                 print("----")
 
             # Calculate loss
-            target_tokens = tokenizer.encode(target_caption)
             loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
@@ -127,14 +144,14 @@ class CaptionTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directory with youe data directory
-    task = CaptionTask(task_type = 'caption', dataset_directories = ['/home/<user_name>/Git/NEKO/your_data_path'], split = 0.1)
+    task = CaptionTask(task_type = 'caption', dataset_directories = ['/home/<user_name>/Git/NEKO/your_data_path'], test_data_prop = 0.1)
     #print(task.dataset["train"][4]["images"][0][1][10])
     #print(task.dataset["train"][4]["images"][0][2][15])
     #print(task.dataset["train"][4]["text"])
     batch = task.sample_batch(5)
     #print(batch)
     print(type(batch))
-    print(batch[0]['images'][0][1][10])
-    print(batch[0]['images'][0][2][15])
-    print(batch[0]['images'].shape)
+    print(batch[0]['image'][0][1][10])
+    print(batch[0]['image'][0][2][15])
+    print(batch[0]['image'].shape)
     print(batch[0]['text'])
