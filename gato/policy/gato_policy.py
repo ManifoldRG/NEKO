@@ -252,8 +252,11 @@ class GatoPolicy(nn.Module):
             n_timesteps = None
 
             # tokenize text
-            if 'text' in batch and batch['text'] is not None:
-                text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
+            if 'text' in batch and batch['text'] is not None or 'text_tokens' in batch and batch['text_tokens'] is not None:
+                if 'text' in batch and batch['text'] is not None:
+                    text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
+                if 'text_tokens' in batch and batch['text_tokens'] is not None:
+                    text_tokens = torch.unsqueeze(batch['text_tokens'], 0)
                 text_tokens = text_tokens.to(self.device)
                 text_tokens = text_tokens.long()
                 text_embeddings = self.embed_token(text_tokens)
@@ -466,24 +469,30 @@ class GatoPolicy(nn.Module):
         image is in the format of 1 x 3 x H x W, where 1 is the num_images, 3 is the 3 RGB channels, default value for H and W is 256
         max_length is the max length of caption to be generated, will cut off at max_length
         """
+        
         image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate caption
         n_images = image_embeddings.shape[0]
         n_patches = image_embeddings.shape[1] 
         assert n_images == 1, "number of images should always be 1 for predicting caption"
 
-        pred_caption = None # This is the predicted caption so far, intilize it to None to prepare for the loop below
         caption_tokens = []
 
         for idx in range(max_length): # idx can be viewed as the index of the 'next_token' within the list of such generated caption tokens
-            # Include no 'image', but 'image_embeddings' below to avoid re-calculating the same image embedding in every loop
+
+            # Include 'image_embeddings' instead of 'images' below to avoid re-calculating the same image embedding in every loop
+            # Include text_tokens instead of the text itself (i.e. the pred_caption), the reason is to avoid an edge case where the generated 
+            # tokens could contain a sequence of .... (periods) or ,,,, (commas), and if the text is included instead of text_tokens, the tokenizer 
+            # will treat the sequence as one token (which is not the desired behavior) instead of a group of separate tokens (the desired behavior), 
+            # and raise "index out of bound" exception on "n_patches - 1 : n_patches + idx" below where pred_logits is calculated
             batch_dict = {
                 'image_embeddings': image_embeddings,
-                'text': pred_caption
+                'text_tokens': torch.tensor(caption_tokens)
             }
-            token_embeddings, _, _, token_masks = self.tokenize_input_dicts([batch_dict])
-            logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+
+            logits, _ = self.forward([batch_dict])
             # logits' shape is (batch_size, seq_length, vocab_size), here batch_size should always be 1
             assert logits.shape[0] == 1, "batch size should always be 1 for predicting caption"
+
             # Each patch of an image is treated as one token (vision transformer), so n_patches is the number of tokens representing an image
             # In the model training (fine-tuning) for image-caption task, each sequence starts with image tokens, followed by the text tokens 
             # of the corresponding caption. When predicting the caption from an image, we pass the image embeddings of the image tokens through 
@@ -505,17 +514,16 @@ class GatoPolicy(nn.Module):
             if next_token == self.text_tokenizer.eos_token_id:
                 break
             
-            # Keep appending the next_token to the generated caption tokens, continue the loop by feeding the generated 
-            # caption text along with the image embeddings into the transformer to generate the next next_token
+            # Keep appending the next_token to the generated caption tokens, continue the loop by feeding the 
+            # generated tokens along with the image embeddings into the transformer to generate the next next_token
             caption_tokens.append(next_token)
-            pred_caption = self.text_tokenizer.decode(caption_tokens)
 
         if len(caption_tokens) < max_length: #then pad with eos to max_length
             caption_tokens = caption_tokens.append([self.text_tokenizer.eos_token_id]*(max_length - len(caption_tokens)))
-            pred_caption = self.text_tokenizer.decode(caption_tokens)
+        pred_caption = self.text_tokenizer.decode(caption_tokens)
 
-        # The logits for all of the predicted "next_token" as tokens in the predicted caption
-        # (1, idx+1, self.text_tokens) squeezd to (idx+1, self.text_tokens), idx+1 is the length of predicted caption
+        # The logits for all of the predicted "next_token"'s as tokens in the predicted caption
+        # squeeze shape (1, idx+1, self.text_tokens) to (idx+1, self.text_tokens), idx+1 is the length of predicted caption
         pred_logits = logits[:, n_patches - 1 : n_patches + idx, :self.text_tokens].squeeze()  
         return pred_logits, pred_caption
 

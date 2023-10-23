@@ -28,11 +28,8 @@ class CaptionTask(Task):
         placed into the data structures to be used for training and evaluation. 
         test_data_prop is a percentage of data for test data, and 1-test_data_prop is the percentage of training data.
         test_data_mask_file is a file containing a mask for the indices of test data in the dataset processed 
-        during training phase when the dataset is separated into a trating set and and a test set 
-        And this mask keeps track of the indices of test data in the dataset. When it is not None, that indicates 
-        evalaution phase, and test data needs to be constructed accoring to the mask, and be used for evalaution.
-        If test_data_mask_file is None, that indicates evalaution phase, and we need to split data into training
-        and test data, and save the test data mask into a file to bse used to construct test data during evaluation phase
+        during training phase when the dataset is separated into a training set and and a test set 
+        And this mask keeps track of the indices of test data in the dataset.  
         """
         super().__init__(task_type)
         self.dataset = {}
@@ -54,7 +51,7 @@ class CaptionTask(Task):
             img_data = np.asarray(img)
             # Through testing of processing multiple .tar files, we have figured out that we need "try except" in the following 
             # because sometimes the img_data is only (256, 256) insetad of (256, 256,3) (assuming all image sizes are 256x256)
-            # and transpose will raise an error and everything grinds to a halt. It is perhaps a bug in the "img2dataset" unitlity we
+            # and the following transpose will raise an error and everything grinds to a halt. It is perhaps a bug in the "img2dataset" unitlity
             # used to downlaod datasets into tar files. When such error occurs, we just ignore the current bundle and move to the next one
             try:
                 img_data = img_data.transpose(2, 0, 1) # reshape from (256, 256, 3) to (3, 256, 256)
@@ -67,14 +64,14 @@ class CaptionTask(Task):
             item['text'] = bundle['txt'][0].decode('utf-8')
             all_data.append(item)
 
-        #test_data_mask_file is a .json file, this is evalaution phase, need to construct test data according to mask
+        #test_data_mask_file is a .json file used to construct test data when evaluation of model is run separately, i.e. not run inside training loop
         if test_data_mask_file is not None: 
             with open(test_data_mask_file, 'r') as f:
                 test_data_mask = json.load(f) # this should be a list on int
                 assert len(test_data_mask) == len(all_data), "len(test_data_mask) must be equal to len(all_data)" 
                 self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
 
-        else: # this is training phase, separate data into training and test data
+        else: # this is when model training is run, need to separate data into training and test set
             test_data_len = math.ceil(len(all_data)*test_data_prop)
             test_data_mask = [0]*len(all_data)
             test_data_indices = [random.randint(0, len(all_data)-1) for _ in range(test_data_len)]
@@ -101,7 +98,7 @@ class CaptionTask(Task):
 
         return batch_dicts
 
-    # The following function reuses code from the evaluate() function defined for text task. Eventually, it will be the 
+    # The following function reuses some code from the evaluate() function defined for text task. Eventually, it will be the 
     # best if the common code between the two evaluate() functions can be defined in one function and reused by both
     def evaluate(self, model, num_examples_to_test=100, deterministic=True, log_examples_to_output=False):    
         tokenizer = model.text_tokenizer
@@ -119,6 +116,7 @@ class CaptionTask(Task):
             image = self.dataset['test'][idx]['image']
             target_caption = self.dataset['test'][idx]['text']
             target_tokens = tokenizer.encode(target_caption)
+
             # Generate prediction
             pred_logits, pred_caption = model.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
