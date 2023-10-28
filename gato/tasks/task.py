@@ -6,6 +6,7 @@ class TaskTypeEnum(Enum):
     CONTROL = "control"
     TEXT = "text"
     CAPTION = "caption"
+    VQA = "vqa"
     # add more as we add more modalities
 
 class Task(ABC):

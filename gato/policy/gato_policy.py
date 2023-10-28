@@ -463,12 +463,89 @@ class GatoPolicy(nn.Module):
 
         return concat_probs, concat_pred_tokens
 
-
-    def predict_caption(self, image, max_length=128, deterministic=True):
+    # This funciton can be used to generate a response from an image, such as generating the caption or 
+    # an answer to a question about an image, it is adapted from the original predict_caption() function
+    def predict_response(self, image, prompt_tokens = [], max_length=128, deterministic=True):
         """
         image is in the format of 1 x 3 x H x W, where 1 is the num_images, 3 is the 3 RGB channels, default value for H and W is 256
-        max_length is the max length of caption to be generated, will cut off at max_length
+        prompt_tokens is a list of text tokens, if the predicted response is the caption for the image, then it is an empty list
+            if the predicted response is an answer to a question about the image, then this list are the tokens of the question
+        max_length is the max length of response to be generated, will cut off at max_length
         """
+        image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate response
+        n_images = image_embeddings.shape[0]
+        n_patches = image_embeddings.shape[1] 
+        assert n_images == 1, "number of images should always be 1 for predicting response"
+
+        response_tokens = []
+
+        for idx in range(max_length): # idx can be viewed as the index of the 'next_token' within the list of such generated response tokens
+
+            # Include 'image_embeddings' instead of 'images' below to avoid re-calculating the same image embedding in every loop
+            # Include text_tokens instead of the text itself (i.e. the pred_response), the reason is to avoid an edge case where the generated 
+            # tokens could contain a sequence of .... (periods) or ,,,, (commas), and if the text is included instead of text_tokens, the tokenizer 
+            # will treat the sequence as one token (which is not the desired behavior) instead of a group of separate tokens (the desired behavior), 
+            # and raise "index out of bound" exception on "n_patches - 1 + len(prompt_tokens)" below where next_token_logits is calculated
+            batch_dict = {
+                'image_embeddings': image_embeddings,
+                'text_tokens': torch.tensor(prompt_tokens + response_tokens)
+            }
+
+            logits, _ = self.forward([batch_dict])
+            # logits' shape is (batch_size, seq_length, vocab_size), here batch_size should always be 1
+            assert logits.shape[0] == 1, "batch size should always be 1 for predicting response"
+
+            # Each patch of an image is treated as one token (vision transformer), so n_patches is the number of tokens representing an image
+            # In the model training (fine-tuning) for image-response task, each sequence starts with image tokens, followed by the text tokens 
+            # of the corresponding response. When predicting the response from an image, we pass the image embeddings of the image tokens through 
+            # the transformer, and then auto-regressively predict the next tokens, the context info of the image is conveyed through the 
+            # self-attention mechanism. The first text token of the generated response is the "next token" predicted by the last image token 
+            # in the sequence, and the second text token is predicted by the first text token, so on and so forth. 
+            # In the following line of code:
+            #   n_patches - 1 + len(prompt_tokens) + idx is the index of the token in the sequence that will predict the next text token of the generated response
+            #   squeeze the logits from shape (1, 1, vocab_size) to shape (vocab_size) and restrict the choice to the range 
+            #       within text tokens. The complete vocab contains non-text toksns also, we need to to exclude them from the choice
+            next_token_logits = logits[:, n_patches -1 + len(prompt_tokens) + idx, :].squeeze()[:self.text_tokens]     # shape (self.text_tokens)
+            if deterministic:
+                next_token = torch.argmax(next_token_logits).item()
+            else:
+                probs = F.softmax(next_token_logits)
+                next_token = torch.multinomial(probs, num_samples=1).item()
+
+            # Stop generating text tokens when the eos_token_id is reached
+            if next_token == self.text_tokenizer.eos_token_id:
+                break
+            
+            # Keep appending the next_token to the generated response tokens, continue the loop by feeding the 
+            # generated tokens along with the image embeddings into the transformer to generate the next next_token
+            response_tokens.append(next_token)
+
+        if len(response_tokens) < max_length: #then pad with eos to max_length
+            response_tokens = response_tokens.append([self.text_tokenizer.eos_token_id]*(max_length - len(response_tokens)))
+        pred_response = self.text_tokenizer.decode(response_tokens)
+
+        # The logits for all of the predicted "next_token"'s as tokens in the predicted response
+        # squeeze shape (1, idx+1, self.text_tokens) to (idx+1, self.text_tokens), idx+1 is the length of predicted response
+        # Note: need to use squeeze(0) since we only want to squeeze on the first dim. 
+        # Do not use squeeze() since it will squeeze all dim of 1, in case idx==0 and idx+1==1, we do not want to squeeze on the 2nd dim
+        pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches + len(prompt_tokens) + idx, :self.text_tokens].squeeze(0)  
+        return pred_logits, pred_response 
+    
+    def predict_caption(self, image, max_length=128, deterministic=True):
+        pred_logits, pred_caption =  self.predict_response(image, prompt_tokens = [], max_length=max_length, deterministic=deterministic)
+        return pred_logits, pred_caption
+
+    def predict_answer(self, image, question, max_length=16, deterministic=True):
+        prompt_tokens = self.text_tokenizer.encode(question)
+        pred_logits, pred_answer =  self.predict_response(image, prompt_tokens = prompt_tokens, max_length=max_length, deterministic=deterministic)
+        return pred_logits, pred_answer
+
+    """
+    # original predict_caption
+    def predict_caption(self, image, max_length=128, deterministic=True):
+
+        # image is in the format of 1 x 3 x H x W, where 1 is the num_images, 3 is the 3 RGB channels, default value for H and W is 256
+        # max_length is the max length of caption to be generated, will cut off at max_length
         
         image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate caption
         n_images = image_embeddings.shape[0]
@@ -526,7 +603,7 @@ class GatoPolicy(nn.Module):
         # squeeze shape (1, idx+1, self.text_tokens) to (idx+1, self.text_tokens), idx+1 is the length of predicted caption
         pred_logits = logits[:, n_patches - 1 : n_patches + idx, :self.text_tokens].squeeze()  
         return pred_logits, pred_caption
-
+    """   
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
     def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
         """For a single control example, generate prediction (action)"""

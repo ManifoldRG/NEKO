@@ -1,6 +1,7 @@
 import argparse
 import random
 import os
+from types import NoneType
 
 import wandb
 import torch
@@ -19,6 +20,7 @@ from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
 from gato.tasks.caption_task import CaptionTask
+from gato.tasks.vqa_task import VqaTask
 from gato.tasks.task import TaskTypeEnum
 
 
@@ -53,13 +55,20 @@ def main(args):
         tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
-
  
     if len(args.caption_datasets) > 0:
         # add caption datasets
         tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_datasets, args.test_data_prop))
     else:
         assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
+    
+    if len(args.vqa_datasets) > 0:
+        # add caption datasets
+        tasks.append(VqaTask(TaskTypeEnum.VQA.value, args.vqa_datasets, 
+            args.train_imgs_directory, args.train_questions_file, args.train_annotations_file,  
+            args.test_imgs_directory, args.test_questions_file, args.test_annotations_file))
+    else:
+        assert (args.vqa_prop == 0), 'vqa_prop must be 0 if no text datasets are specified'
 
 
     model = GatoPolicy(
@@ -195,6 +204,7 @@ if __name__ == '__main__':
     # training hyperparameters
     parser.add_argument('--text_prop', type=float, default=0) # proportion of text data in batch
     parser.add_argument('--caption_prop', type=float, default=0) # proportion of image caption data in batch
+    parser.add_argument('--vqa_prop', type=float, default=0) # proportion of vqa data in batch
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
@@ -229,12 +239,25 @@ if __name__ == '__main__':
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
+
     parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
+
     parser.add_argument('--caption_datasets', type=str, nargs='+', default=[])
     parser.add_argument('--test_data_prop', type=str, nargs='+', default=0.1) # this is for image caption task only, the proportion of test data out of all of the data
+    
+    parser.add_argument('--vqa_datasets', type=str, default='')
+    parser.add_argument('--train_imgs_directory', type=str, default='')
+    parser.add_argument('--train_questions_file', type=str, default='')
+    parser.add_argument('--train_annotations_file', type=str, default='')
+    parser.add_argument('--test_imgs_directory', type=str, default='')
+    parser.add_argument('--test_questions_file', type=str, default='')
+    parser.add_argument('--test_annotations_file', type=str, default='')
+
     parser.add_argument('--eval_caption_num_examples', type=int, default=100)
     parser.add_argument('--eval_caption_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
 
+    parser.add_argument('--eval_vqa_num_examples', type=int, default=100)
+    parser.add_argument('--eval_vqa_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted

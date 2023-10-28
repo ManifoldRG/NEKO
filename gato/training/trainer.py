@@ -93,7 +93,10 @@ class Trainer:
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_caption_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_caption_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/caption/{k}'] = v
-
+                elif task.task_type == TaskTypeEnum.VQA.value:
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_vqa_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_caption_log_examples)
+                    for k, v in eval_logs.items():
+                        logs[f'evaluation/caption/{k}'] = v
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
@@ -126,9 +129,11 @@ class Trainer:
         # Calculate text and control batch sizes based on text_prop
         text_batch_size = int(self.args.text_prop * self.args.batch_size)
         caption_batch_size = int(self.args.caption_prop * self.args.batch_size)
-        control_batch_size = self.args.batch_size - text_batch_size - caption_batch_size
+        vqa_batch_size = int(self.args.vqa_prop * self.args.batch_size)
+        control_batch_size = self.args.batch_size - text_batch_size - caption_batch_size - vqa_batch_size
         text_batch_dicts = []
         caption_batch_dicts = []
+        vqa_batch_dicts = []
         control_batch_dicts = []
 
         # Sample text and control batches
@@ -136,11 +141,13 @@ class Trainer:
             text_batch_dicts = self.sample_text_batch(text_batch_size)
         if caption_batch_size > 0:
             caption_batch_dicts = self.sample_caption_batch(caption_batch_size)
+        if vqa_batch_size > 0:
+            vqa_batch_dicts = self.sample_vqa_batch(vqa_batch_size)        
         if control_batch_size > 0:
             control_batch_dicts = self.sample_control_batch(control_batch_size)
 
         # Combine the batches
-        combined_batch_dicts = text_batch_dicts + caption_batch_dicts + control_batch_dicts
+        combined_batch_dicts = text_batch_dicts + caption_batch_dicts + vqa_batch_dicts+ control_batch_dicts
 
         logs['time/sample_batch'] = time.time() - start_time
         with self.accelerator.accumulate(self.model):
@@ -170,6 +177,13 @@ class Trainer:
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
     
+    def sample_vqa_batch(self, batch_size):
+        batch_dicts = []
+        vqa_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.VQA.value]
+        for i,task in enumerate (vqa_tasks):
+            batch_dicts.extend(task.sample_batch(batch_size))
+        return batch_dicts
+
     def sample_control_batch(self, batch_size):
         batch_dicts = []
 
