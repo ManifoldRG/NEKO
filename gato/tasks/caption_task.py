@@ -18,14 +18,18 @@ import json
 import random
 
 class CaptionTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, caption_datasets, test_data_prop = 0.1, test_data_mask_file = None):
+    def __init__(self, task_type: TaskTypeEnum, caption_dataset, train_data, test_data = [],
+                 test_data_prop = 0.1, test_data_mask_file = None):
         """
         task_type should be CAPTION
-        caption_datasets is a list of diretories, with each directory in the format of something similar to 
-        /home/<user_name>/NEKO/Dataset01... etc.), and contains one image-caption dataset which is composed of 
-        multiple .tar files downloaded with img2dataset. Each tar file contains multiple bundles, with each bundle 
-        containing one .jpg, one txt and one json file. The .jpg and the txt file (the caption) are extracted and 
-        placed into the data structures to be used for training and evaluation. 
+        caption_dataset is the directory for all of the data (traing and test)
+        train_data and test_data are list of sub_diretories under caption_dataset, with each directory containing 
+        one image-caption dataset which is composed of multiple .tar files downloaded with img2dataset. 
+        Each tar file contains multiple bundles, with each bundle containing one .jpg, one txt and one json file. 
+        The .jpg and the txt file (the caption) are extracted and placed into the data structures to be used for training and evaluation.
+        
+        The following two parameters are used when only train data is provided, in that case we need to split it 
+        into training and test dataset: 
         test_data_prop is a percentage of data for test data, and 1-test_data_prop is the percentage of training data.
         test_data_mask_file is a file containing a mask for the indices of test data in the dataset processed 
         during training phase when the dataset is separated into a training set and and a test set 
@@ -33,12 +37,43 @@ class CaptionTask(Task):
         """
         super().__init__(task_type)
         self.dataset = {}
-        all_data = []
-        for directory in caption_datasets:
+
+        if not caption_dataset.endswith('/'):
+            caption_dataset = caption_dataset + '/'
+
+        assert len(train_data) > 0, "Must provide train datasets for caption task" 
+        
+        if len(test_data) > 0: # Note: len(train_data_directories)>0 also holds due to the abpve-mentioned assert
+            self.dataset['train'] = self.process_data(caption_dataset, train_data)
+            self.dataset['test'] = self.process_data(caption_dataset, test_data)
+        else: # no test dataset is provided, need to aplit the training dataset 
+            all_data = self.process_data(caption_dataset, train_data)
+            #test_data_mask_file is a .json file used to construct test data when evaluation of model is run separately, i.e. not run inside training loop
+            if test_data_mask_file is not None: 
+                with open(test_data_mask_file, 'r') as f:
+                    test_data_mask = json.load(f) # this should be a list on int
+                    assert len(test_data_mask) == len(all_data), "len(test_data_mask) must be equal to len(all_data)" 
+                    self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
+            else: # this is when model training is run, need to split data into training and test set
+                test_data_len = math.ceil(len(all_data)*test_data_prop)
+                test_data_mask = [0]*len(all_data)
+                test_data_indices = [random.randint(0, len(all_data)-1) for _ in range(test_data_len)]
+                for index in test_data_indices:
+                    test_data_mask[index] = 1 # set the mask of test data item to 1, then training data are the element with mask 0
+                self.dataset['train'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 0]
+                self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
+
+                with open('test_data_mask.json', 'w') as f:
+                    json.dump(test_data_mask, f)
+    
+    def process_data(self, caption_dataset, data_directories):
+        dataset = []
+        for directory in data_directories:
             tar_files = []
-            for file in os.listdir(directory):
+            data_directory = caption_dataset + directory
+            for file in os.listdir(data_directory):
                 if fnmatch.fnmatch(file, '*.tar'):
-                    tar_files.append(os.path.join(directory, file))
+                    tar_files.append(os.path.join(data_directory, file))
         
         # https://github.com/webdataset/webdataset#dataloader: WebDataset is just an instance of a standard IterableDataset
         # In the following, data from multiple tar files are combined into one WebDataset, and then wrapped into a DalaLoader
@@ -62,27 +97,9 @@ class CaptionTask(Task):
             # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
             item['image'] = torch.tensor(img_data[np.newaxis, :])
             item['text'] = bundle['txt'][0].decode('utf-8')
-            all_data.append(item)
-
-        #test_data_mask_file is a .json file used to construct test data when evaluation of model is run separately, i.e. not run inside training loop
-        if test_data_mask_file is not None: 
-            with open(test_data_mask_file, 'r') as f:
-                test_data_mask = json.load(f) # this should be a list on int
-                assert len(test_data_mask) == len(all_data), "len(test_data_mask) must be equal to len(all_data)" 
-                self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
-
-        else: # this is when model training is run, need to separate data into training and test set
-            test_data_len = math.ceil(len(all_data)*test_data_prop)
-            test_data_mask = [0]*len(all_data)
-            test_data_indices = [random.randint(0, len(all_data)-1) for _ in range(test_data_len)]
-            for index in test_data_indices:
-                test_data_mask[index] = 1 # set the mask of test data item to 1, then training data are the element with mask 0
-            self.dataset['train'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 0]
-            self.dataset['test'] = [item for item, mask in zip(all_data, test_data_mask) if mask == 1]
-
-            with open('test_data_mask.json', 'w') as f:
-                json.dump(test_data_mask, f)
-
+            dataset.append(item)
+        return dataset       
+    
     def sample_batch(self, batch_size):
         random_indices = np.random.randint(0, len(self.dataset['train']), size=batch_size)
         random_indices = [i.item() for i in random_indices]
@@ -141,15 +158,17 @@ class CaptionTask(Task):
 
 # test code
 if __name__ == '__main__':
-    # replace the following directory with youe data directory
-    task = CaptionTask(task_type = 'caption', dataset_directories = ['/home/<user_name>/Git/NEKO/your_data_path'], test_data_prop = 0.1)
+    # replace the following directory with your data directory
+    task = CaptionTask(task_type = 'caption', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
+                       train_data = ['train'], test_data = ['test'], test_data_prop = 0.1)
+
     #print(task.dataset["train"][4]["images"][0][1][10])
     #print(task.dataset["train"][4]["images"][0][2][15])
     #print(task.dataset["train"][4]["text"])
     batch = task.sample_batch(5)
     #print(batch)
     print(type(batch))
-    print(batch[0]['image'][0][1][10])
-    print(batch[0]['image'][0][2][15])
-    print(batch[0]['image'].shape)
+    print(batch[0]['images'][0][1][10])
+    print(batch[0]['images'][0][2][15])
+    print(batch[0]['images'].shape)
     print(batch[0]['text'])

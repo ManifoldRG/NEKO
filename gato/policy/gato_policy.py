@@ -526,8 +526,8 @@ class GatoPolicy(nn.Module):
 
         # The logits for all of the predicted "next_token"'s as tokens in the predicted response
         # squeeze shape (1, idx+1, self.text_tokens) to (idx+1, self.text_tokens), idx+1 is the length of predicted response
-        # Note: need to use squeeze(0) since we only want to squeeze on the first dim. 
-        # Do not use squeeze() since it will squeeze all dim of 1, in case idx==0 and idx+1==1, we do not want to squeeze on the 2nd dim
+        # Note: need to use squeeze(0) since we only want to squeeze on the first dim. Do not use squeeze() since it will squeeze all dims
+        # with a dim value of 1. In case idx+1==1, i.e., the length of predicted response is 1, we do not want to squeeze on that dim
         pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches + len(prompt_tokens) + idx, :self.text_tokens].squeeze(0)  
         return pred_logits, pred_response 
     

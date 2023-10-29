@@ -30,17 +30,16 @@ class VqaTask(Task):
         """
         super().__init__(task_type)
         self.dataset = {}
+        if not vqa_dataset.endswith('/'):
+            vqa_dataset = vqa_dataset + '/'
+
         self.dataset['train'] = self.process_data(vqa_dataset, train_imgs_directory, train_questions_file, train_annotations_file, train_img_name_prefix, train_img_file_name_len)
         self.dataset['test'] = self.process_data(vqa_dataset, test_imgs_directory, test_questions_file, test_annotations_file, test_img_name_prefix, test_img_file_name_len)
-        #print(f"------len(self.dataset['train']) = {len(self.dataset['train'])}")
-        #print(f"------len(self.dataset['test']) = {len(self.dataset['test'])}")
 
     def process_data(self, vqa_dataset, imgs_directory, questions_file, annotations_file, img_name_prefix, img_file_name_len):
         dataset = []
         item = {}
 
-        if not vqa_dataset.endswith('/'):
-            vqa_dataset = vqa_dataset + '/'
         if not imgs_directory.endswith('/'):
             imgs_directory = vqa_dataset + imgs_directory + '/'
 
