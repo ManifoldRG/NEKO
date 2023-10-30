@@ -14,60 +14,76 @@ import json
 import random
 
 class VqaTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, vqa_dataset,
-                 train_imgs_directory, train_questions_file, train_annotations_file, 
-                 test_imgs_directory, test_questions_file, test_annotations_file,
+    def __init__(self, task_type: TaskTypeEnum, vqa_dataset, train_data, test_data, 
                  train_img_name_prefix = 'COCO_train2014_', train_img_file_name_len = 27, 
-                 test_img_name_prefix = 'COCO_val2014_', test_img_file_name_len = 25):
+                 test_img_name_prefix = 'COCO_val2014_', test_img_file_name_len = 25,
+                 questions_file = 'questions.json', annotations_file = 'annotations.json'):
         """
         task_type should be VQA
-        vqa_dataset is the directory where the data for vqa task is located, whould end with "/" 
-        ***_questions_file is a .json file under the vqa_dataset directory containining questions and images IDs
-        ***_annotations_file is a .json file under the vqa_dataset directory containing images IDs, quesitons and answers 
-        ***_imgs_directory are sub-diretories under vqa_dataset where the training or testing images are located, should end with "/"
-        ***_img_name_prefix is the prefix for each image name file
-        ***_img_file_name_len is the length of image file names
+        vqa_dataset is the directory where the data for vqa task is located, should end with "/" 
+        train_data and test_data are each a list of sub directories where training data and test data are located
+        ***_img_name_prefix is a list, each item of the list holds the image file name prefix for each sub directory
+        ***_img_file_name_len is a list, each item of the list holds the length of image file name for each sub directory
+        ***_questions_file is a .json file name for for the file under each sub directory containining questions and images IDs
+        ***_annotations_file is a .json file name for the file under each sub directory containing images IDs, quesitons and answers
+        For the current implementaiton, it is required that these files are named "questions.json" and "annnotations.json" under each sub diredctory
+        Each sub directory should also contain the image files associated with the corresponding question and annotation files
         """
         super().__init__(task_type)
+
+        assert len(train_data) == len(test_data), "Number of training data and test data sub director must be equal to each other" 
+
         self.dataset = {}
         if not vqa_dataset.endswith('/'):
             vqa_dataset = vqa_dataset + '/'
 
-        self.dataset['train'] = self.process_data(vqa_dataset, train_imgs_directory, train_questions_file, train_annotations_file, train_img_name_prefix, train_img_file_name_len)
-        self.dataset['test'] = self.process_data(vqa_dataset, test_imgs_directory, test_questions_file, test_annotations_file, test_img_name_prefix, test_img_file_name_len)
+        self.dataset['train'] = self.process_data(vqa_dataset, train_data, train_img_name_prefix, train_img_file_name_len, questions_file, annotations_file)
+        self.dataset['test'] = self.process_data(vqa_dataset, test_data, test_img_name_prefix, test_img_file_name_len, questions_file, annotations_file)
 
-    def process_data(self, vqa_dataset, imgs_directory, questions_file, annotations_file, img_name_prefix, img_file_name_len):
+    def process_data(self, vqa_dataset, data_directories, img_name_prefix, img_file_name_len, questions_file, annotations_file):
         dataset = []
         item = {}
 
-        if not imgs_directory.endswith('/'):
-            imgs_directory = vqa_dataset + imgs_directory + '/'
+        dir_idx = 0
+        for directory in data_directories:
+            data_directory = vqa_dataset + directory
+            if not data_directory.endswith('/'):
+                data_directory = data_directory + '/'
 
-        with open(vqa_dataset + annotations_file, 'r') as json_file:
-            # This is a list, each item contains an image ID, a question ID, and its corresponding answers (multiple answers to one question)
-            annotations = json.load(json_file)['annotations'] 
-        with open(vqa_dataset + questions_file, 'r') as json_file:
-            questions = json.load(json_file)['questions'] # This is a list question IDs and the corresponding questions
-        assert len(annotations) == len(questions), "Number of annotations must be equal to number of questions" 
-
-        for idx in range(len(questions)):
-            assert annotations[idx]['image_id'] == questions[idx]['image_id'] and annotations[idx]['question_id'] == questions[idx]['question_id']
-            image_id = str(annotations[idx]['image_id'])
-            img_file_name = img_name_prefix + '0' * (img_file_name_len - len(image_id) - len(img_name_prefix)) + image_id + '.jpg'
             try:
-                # if the file does not exist or transpose does not work due to damaged data, we simply discard this sample and move to next
-                img = Image.open(imgs_directory + img_file_name) 
-                img= img.resize((256, 256))
-                img_data = np.asarray(img)
-                img_data = img_data.transpose(2, 0, 1) # reshape from (256, 256, 3) to (3, 256, 256)
+                with open(data_directory + annotations_file, 'r') as json_file:
+                    # This is a list, each item contains an image ID, a question ID, and its corresponding answers (multiple answers to one question)
+                    annotations = json.load(json_file)['annotations'] 
             except:
-                continue
-            # Need to add a new dimension to (3, 256, 256) so it becomes (1, 3, 256, 256) where the added dummy dimension at dim 0 is the num_images. 
-            # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
-            item['image'] = torch.tensor(img_data[np.newaxis, :])
-            item['question'] = questions[idx]['question']
-            item['answers'] = annotations[idx]['answers']
-            dataset.append(item)
+                print(f"{data_directory} does not have a questions json file, or it is not named as annotations.json")
+
+            try:
+                with open(data_directory + questions_file, 'r') as json_file:
+                    questions = json.load(json_file)['questions'] # This is a list of question IDs and the corresponding questions
+            except:
+                print(f"{data_directory} does not have an annotations json file, or it is not named as questions.json")
+
+            assert len(annotations) == len(questions), "Number of annotations must be equal to number of questions" 
+        
+            for idx in range(len(questions)):
+                assert annotations[idx]['image_id'] == questions[idx]['image_id'] and annotations[idx]['question_id'] == questions[idx]['question_id']
+                image_id = str(annotations[idx]['image_id'])
+                img_file_name = img_name_prefix[dir_idx] + '0' * (img_file_name_len[dir_idx] - len(image_id) - len(img_name_prefix[dir_idx])) + image_id + '.jpg'
+                try:
+                    # if the image file does not exist or transpose does not work due to damaged data, we simply discard this sample and move to next
+                    img = Image.open(data_directory + img_file_name) 
+                    img= img.resize((256, 256))
+                    img_data = np.asarray(img)
+                    img_data = img_data.transpose(2, 0, 1) # reshape from (256, 256, 3) to (3, 256, 256)
+                except:
+                    continue
+                # Need to add a new dimension to (3, 256, 256) so it becomes (1, 3, 256, 256) where the added dummy dimension at dim 0 is the num_images. 
+                # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
+                item['image'] = torch.tensor(img_data[np.newaxis, :])
+                item['question'] = questions[idx]['question']
+                item['answers'] = annotations[idx]['answers']
+                dataset.append(item)
+            dir_idx = dir_idx + 1
         return dataset
     
     def sample_batch(self, batch_size):
@@ -111,7 +127,6 @@ class VqaTask(Task):
                 print(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
                 print("----")
 
-            #print(f"pred_logits.shape = {pred_logits.shape}")
             # Calculate loss
             loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
             total_loss += loss.item()
@@ -134,12 +149,8 @@ if __name__ == '__main__':
     # replace the following directories and files names with your directories and files
     task = VqaTask(task_type = 'vqa', 
                    vqa_dataset              = '/home/<user name>/Git/NEKO/VQA_Data/',
-                   train_imgs_directory     = 'train2014', 
-                   train_questions_file     = 'OpenEnded_mscoco_train2014_questions.json', 
-                   train_annotations_file   = 'mscoco_train2014_annotations.json', 
-                   test_imgs_directory      = 'val2014', 
-                   test_questions_file      = 'OpenEnded_mscoco_val2014_questions.json', 
-                   test_annotations_file    = 'mscoco_val2014_annotations.json')
+                   train_data           = ['train2014'], 
+                   test_data            = ['val2014'])
 
     batch = task.sample_batch(5)
     print(type(batch))

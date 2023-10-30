@@ -22,9 +22,9 @@ class CaptionTask(Task):
                  test_data_prop = 0.1, test_data_mask_file = None):
         """
         task_type should be CAPTION
-        caption_dataset is the directory for all of the data (traing and test)
+        caption_dataset is the directory for all of the data (training and test)
         train_data and test_data are list of sub_diretories under caption_dataset, with each directory containing 
-        one image-caption dataset which is composed of multiple .tar files downloaded with img2dataset. 
+        one training or test dataset which is composed of multiple .tar files downloaded with img2dataset. 
         Each tar file contains multiple bundles, with each bundle containing one .jpg, one txt and one json file. 
         The .jpg and the txt file (the caption) are extracted and placed into the data structures to be used for training and evaluation.
         
