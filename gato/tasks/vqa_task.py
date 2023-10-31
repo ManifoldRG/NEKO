@@ -15,9 +15,9 @@ import random
 
 class VqaTask(Task): 
     def __init__(self, task_type: TaskTypeEnum, vqa_dataset, train_data, test_data, 
-                 train_img_name_prefix = 'COCO_train2014_', train_img_file_name_len = 27, 
-                 test_img_name_prefix = 'COCO_val2014_', test_img_file_name_len = 25,
-                 questions_file = 'questions.json', annotations_file = 'annotations.json'):
+                 train_img_name_prefix, train_img_file_name_len, 
+                 test_img_name_prefix, test_img_file_name_len,
+                 questions_file, annotations_file):
         """
         task_type should be VQA
         vqa_dataset is the directory where the data for vqa task is located, should end with "/" 
@@ -147,10 +147,17 @@ class VqaTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directories and files names with your directories and files
-    task = VqaTask(task_type = 'vqa', 
+    task = VqaTask(task_type                = 'vqa', 
                    vqa_dataset              = '/home/<user name>/Git/NEKO/VQA_Data/',
-                   train_data           = ['train2014'], 
-                   test_data            = ['val2014'])
+                   train_data               = ['train2014'], 
+                   test_data                = ['val2014'],
+                   train_img_name_prefix    = ['COCO_train2014_'], 
+                   train_img_file_name_len  = [27], 
+                   test_img_name_prefix     = ['COCO_val2014_'], 
+                   test_img_file_name_len   = [25],
+                   questions_file           = 'questions.json', 
+                   annotations_file         = 'annotations.json'
+                   )
 
     batch = task.sample_batch(5)
     print(type(batch))
