@@ -18,7 +18,7 @@ Practically, building these systems provides us deeper understanding into the ut
 
 ## [Contributing Guide](https://github.com/ManifoldRG/NEKO/blob/master/CONTRIBUTING.md)
 
-## [GATO-Control Implementation](https://github.com/ManifoldRG/gato-control/tree/master/gato)
+## [NEKO Implementation](https://github.com/ManifoldRG/NEKO/tree/master/gato)
 
 If you use this project, we'd love for you to refer back to Manifold in your code!
 
@@ -72,6 +72,16 @@ In general, control_datasets can contain lists of any strings in download_custom
 can mix in a single run, e.g:
 `--control_datasets Breakout-top1-s1-v0 hammer-expert-v0`
 
+Image-Caption (in progress):
+```bash
+python train.py --use_wandb --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=10 --batch_size=4 -k=240 --eval_episodes=10 --sequence_length=1024 --activation_fn=gelu --save_model --caption_prop=1.0 --caption_dataset="/<your data path>/Caption_Data" --caption_train_data=train --caption_test_data=test
+```
+VQA (in progress):
+```bash
+python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=10 --batch_size=4 -k=240 --eval_episodes=10 --sequence_length=1024 --activation_fn=gelu --save_model --vqa_prop=1.0 --vqa_dataset='/<your data path>/VQA_Data/' --vqa_train_data=train2014 --vqa_test_data=val2014 --train_img_name_prefix=COCO_train2014_ --train_img_file_name_len=27 --test_img_name_prefix=COCO_val2014_ --test_img_file_name_len=25
+```
+The `--caption_prop` and `--vqa_prop` are the proportions of samples of data from each of the two tasks (cation and VQA) that is fed into the model training. Such proportions from all tasks should sum up to 1.0 if multiple tasks are trained simultaneously, which should be the case for normal training. The above-mentioned examples single out each task, that is for demo and test purpose.
+
 ## Atari Datasets
 All Atari datasets now follow the convention of `{Name}-top1-s1-v0`, e.g. `Breakout-top1-s1-v0`. Previously, we old runs may have `Breakout-expert_s0-v0` which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
 
@@ -79,6 +89,17 @@ You will be able to train on any env in https://github.com/ManifoldRG/gato-contr
 
 Currently, only Breakout is provided here for testing but others will be available shortly. 
 
+## Image-Caption Datasets
+So far we have identified two datasets, and the number can increase in the future. For both datasets, we have used a tool "img2dataset" to download the data into webdataset format -
+    Data are downloaded into .tar files, each .tar file contains multiple bundles
+    Each bundle contain one image in jpg format resized to the designated size (256*256 by default), one txt file that is the caption for the image and one .json file that is the metadata for this bundle (the URL of the image, the caption, the image size, etc.)
+
+The two datasets:
+    1. https://github.com/rom1504/img2dataset/blob/main/dataset_examples/cc3m.md
+    Follow the instruction there to download the data, and the metadata file name mentioned on the page "cc3m.tsv" might be different from the most up to date source URL: https://ai.google.com/research/ConceptualCaptions/download
+    
+    2. https://github.com/rom1504/img2dataset/blob/main/dataset_examples/mscoco.md
+    Simply follow insturctions to download the dataset
 
 ## Evaluation
 ```bash
