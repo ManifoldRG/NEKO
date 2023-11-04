@@ -91,15 +91,16 @@ Currently, only Breakout is provided here for testing but others will be availab
 
 ## Image-Caption Datasets
 So far we have identified two datasets, and the number can increase in the future. For both datasets, we have used a tool "img2dataset" to download the data into webdataset format -
-    Data are downloaded into .tar files, each .tar file contains multiple bundles
-    Each bundle contain one image in jpg format resized to the designated size (256*256 by default), one txt file that is the caption for the image and one .json file that is the metadata for this bundle (the URL of the image, the caption, the image size, etc.)
+- Data are downloaded into .tar files, each .tar file contains multiple bundles
+- Each bundle contain one image in jpg format resized to the designated size (256*256 by default), one txt file that is the caption for the 
+- image and one .json file that is the metadata for this bundle (the URL of the image, the caption, the image size, etc.)
 
 The two datasets:
-    1. https://github.com/rom1504/img2dataset/blob/main/dataset_examples/cc3m.md
-    Follow the instruction there to download the data, and the metadata file name mentioned on the page "cc3m.tsv" might be different from the most up to date source URL: https://ai.google.com/research/ConceptualCaptions/download
+- https://github.com/rom1504/img2dataset/blob/main/dataset_examples/cc3m.md
+Follow the instruction there to download the data, and the metadata file name mentioned on the page "cc3m.tsv" might be different from the most up to date source URL: https://ai.google.com/research/ConceptualCaptions/download
     
-    2. https://github.com/rom1504/img2dataset/blob/main/dataset_examples/mscoco.md
-    Simply follow insturctions to download the dataset
+- https://github.com/rom1504/img2dataset/blob/main/dataset_examples/mscoco.md
+Simply follow insturctions to download the dataset
 
 ## Evaluation
 ```bash
