@@ -82,6 +82,8 @@ python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --lo
 ```
 The `--caption_prop` and `--vqa_prop` are the proportions of samples of data from each of the two tasks (cation and VQA) that are used for the model. Such proportions from all tasks (control tasks such Atari, and non-control tasks, such as text, image-caption, VQA) should sum up to 1.0 if multiple tasks are trained simultaneously, which should be the case for normal training. The above-mentioned examples single out each task for demo and test purpose.
 
+The Image-Caption and VQA tasks can be tested on Colab, we have a few Colab Notebooks for that purpose in the NEKO/misc folder
+
 ## Atari Datasets
 All Atari datasets now follow the convention of `{Name}-top1-s1-v0`, e.g. `Breakout-top1-s1-v0`. Previously, we old runs may have `Breakout-expert_s0-v0` which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
 
