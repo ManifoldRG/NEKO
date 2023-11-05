@@ -109,7 +109,7 @@ Follow the instruction there to download the data, and the metadata file name me
 Simply follow insturctions to download the dataset
 
 ## VQA Datasets
-So far, we have identified one dataset: https://okvqa.allenai.org/download.html, follow the instruction to download
+So far, we have identified one dataset: https://okvqa.allenai.org/download.html, follow the instruction to download. Each download includes a questions json file and an annotations json files to list the image IDs and the questions and their answers associated with each image ID, and the image files with the image IDs as part of the image file names.
 
 At the time when the VQA task is instantiated, it processes the downloaded data into the format that can be accepted by the model for training. So far the task can only process data in this specific format. As more data sources are identified, different methods to process data may be added when necessary
 
