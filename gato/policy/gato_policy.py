@@ -165,16 +165,17 @@ class GatoPolicy(nn.Module):
 
         if compute_loss:
             # obtain target tokens, and pad
-            loss_logits = logits[:, :-1, :]
-            token_masks = token_masks[:, :-1] # whether originating token is valid
+            # WARN - COULD THIS HAVE AN ERROR?? Verify. Try "1:"" as the second dimension.
+            loss_logits = logits[:, :-1, :] # pick out the probability/logit for very last token [4,95,52305] -> [4,94,52305]
+            token_masks = token_masks[:, :-1] # whether originating token is valid  (remove last token from mask) [4,95] -> [4,94]
 
-            token_target_masks = token_target_masks[:, 1:] # whether target token is valid
-            loss_masks = token_masks * token_target_masks
-            target_tokens = tokens[:, 1:]
+            token_target_masks = token_target_masks[:, 1:] # whether target token is valid | [4,95] -> [4,94] (but keep from 2nd to last token)
+            loss_masks = token_masks * token_target_masks  # make sure we compute the masks | [4,94]
+            target_tokens = tokens[:, 1:] # [4,94]
 
-            loss_masks = loss_masks.reshape(-1)
-            loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0]
-            target_tokens = target_tokens.reshape(-1)[loss_masks > 0]
+            loss_masks = loss_masks.reshape(-1) # [376]
+            loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0] # first part turns it into [376,52305]; then second part of loss_masks>0 -> [214,52305]
+            target_tokens = target_tokens.reshape(-1)[loss_masks > 0]       # first part turns into [376]; then second part of loss_masks>0 -> [214]
             loss = torch.nn.functional.cross_entropy(loss_logits, target_tokens)
             if 'pdb' in kwargs and kwargs['pdb']:
                 import pdb; pdb.set_trace()
@@ -238,6 +239,7 @@ class GatoPolicy(nn.Module):
 
         max_tokens = -1 # max number of timesteps across all batches
         for batch in inputs:
+            # actually this represents a single example even though called a batch
             text_tokens, text_embeddings, text_targets_masks = None, None, None
             image_tokens, image_embeddings, image_targets_masks = None, None, None
             continuous_tokens, continuous_embeddings, continuous_targets_masks = None, None, None
@@ -249,9 +251,16 @@ class GatoPolicy(nn.Module):
 
             # tokenize text
             if 'text' in batch and batch['text'] is not None:
-                text_tokens = self.text_tokenizer.encode(batch['text'], truncation=True, return_tensors='pt')
-                text_tokens = text_tokens.to(self.device)
+                # todo - clean it up so squeeze/unsqueeze happens once.
+                if isinstance(batch['text'], list):
+                    text_tokens = torch.Tensor(batch['text']).unsqueeze(0)     # single example, probably a list of token ids of length context_len
+                else:
+                    if len(batch['text'].shape) == 1:
+                        text_tokens = batch['text'].unsqueeze(0)
+                    else:
+                        text_tokens = batch['text']
                 text_tokens = text_tokens.long()
+                text_tokens = text_tokens.to(self.device)
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets_masks = torch.ones_like(text_tokens)
                 n_timesteps = text_tokens.shape[0]
@@ -406,21 +415,13 @@ class GatoPolicy(nn.Module):
                 token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
 
-    def predict_text(self, input_text, max_length=20, deterministic=True):
+    def predict_text(self, batch_dict, max_length=20, deterministic=True):
         """For a single text example, generate prediction (future text)"""
         
         concat_probs = None
         concat_pred_tokens = None
 
         for _ in range(max_length):
-            batch_dict = {
-                'text': input_text,
-                'images': None,
-                'continuous_obs': None,
-                'discrete_obs': None,
-                'continuous_actions': None,
-                'discrete_actions': None
-            }
             token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
             
             logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)

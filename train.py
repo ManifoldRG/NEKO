@@ -49,7 +49,7 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.sequence_length, tokenizer_model='gpt2')) # todo - remove hardcoding
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 
@@ -120,7 +120,6 @@ def main(args):
     # Create save dir if does not exist
     if args.save_model and not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
