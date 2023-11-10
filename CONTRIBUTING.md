@@ -28,6 +28,6 @@ The part that needs the most new code is to add a new modality or task. As of no
 - Add a few lines of code in `gato/training/trainer.py` to sample data for the new task and add to each batch for training
 - Add a few lines of code in `train.py` to input the command-line args specific to your task and to instantiate an instance of your task
 
-You can take a look of a PR and find out more concrete details to match what is described above, for example, [add_vqa] (https://github.com/ManifoldRG/NEKO/pulls)
+You can take a look of a PR and find out more concrete details to match what is described above, for example, [add_vqa] (https://github.com/ManifoldRG/NEKO/pull/30)
 
 As a final note, please be respectful when commenting on these issues as they are publicly viewable. Thank you!
