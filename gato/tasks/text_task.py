@@ -71,7 +71,7 @@ class TextTask(Task):
         targets = chunk[:, start_idx+1:start_idx+seq_len]
         return inputs, targets
         
-    def evaluate(self, model, num_examples_to_test=100, deterministic=True, log_examples_to_output=False):
+    def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):
         tokenizer = model.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0
@@ -88,7 +88,7 @@ class TextTask(Task):
         print(f'Num of examples to test : {num_examples_to_test} | Actual batch size of test data : {len(batch_dicts)}')
         
         actual_examples_tested = 0
-        for idx in range(num_examples_to_test-1):
+        for idx in range(min(num_examples_to_test, len(batch_dicts))):
             batch_dict = batch_dicts[idx]
             
             # Split the tokens into input and target tokens
