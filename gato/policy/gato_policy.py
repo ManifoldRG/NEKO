@@ -444,7 +444,8 @@ class GatoPolicy(nn.Module):
 
             # Concatenate the next token to the input_ids so it gets used to build token embeddings again
             input_tokens = torch.cat([input_tokens, next_token], dim=-1)
-            input_text = self.text_tokenizer.decode(input_tokens.squeeze())
+            batch_dict['text'] = input_tokens
+            # input_text = self.text_tokenizer.decode(input_tokens.squeeze())
 
             # Stop generating tokens if the eos_token_id is generated
             if next_token.item() == self.text_tokenizer.eos_token_id:
