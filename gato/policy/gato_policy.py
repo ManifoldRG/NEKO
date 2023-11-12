@@ -13,6 +13,7 @@ from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 from gato.tasks.control_task import ControlTask
 from torch.nn import functional as F
+from copy import deepcopy
 
 class GatoPolicy(nn.Module):
     def __init__(
@@ -420,9 +421,10 @@ class GatoPolicy(nn.Module):
         
         concat_probs = None
         concat_pred_tokens = None
+        continuous_input_batch_dict = deepcopy(batch_dict)
 
         for _ in range(max_length):
-            token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
+            token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([continuous_input_batch_dict])
             
             logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
             next_token_logits = logits[:, -1, :]  # Get logits for the next token
@@ -444,7 +446,8 @@ class GatoPolicy(nn.Module):
 
             # Concatenate the next token to the input_ids so it gets used to build token embeddings again
             input_tokens = torch.cat([input_tokens, next_token], dim=-1)
-            batch_dict['text'] = input_tokens
+            
+            continuous_input_batch_dict['text'] = list(input_tokens.squeeze().numpy())
             # input_text = self.text_tokenizer.decode(input_tokens.squeeze())
 
             # Stop generating tokens if the eos_token_id is generated
