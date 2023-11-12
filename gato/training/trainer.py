@@ -85,7 +85,7 @@ class Trainer:
                     for k, v in eval_logs.items():
                         logs[f'evaluation/{task.name}/{k}'] = v
                 elif task.task_type == TaskTypeEnum.TEXT.value:
-                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=False, log_examples_to_output=self.args.eval_text_log_examples)
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
                     pass
