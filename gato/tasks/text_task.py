@@ -85,6 +85,7 @@ class TextTask(Task):
             print(f'--- examples ---')
         
         batch_dicts = self.sample_batch(num_examples_to_test, is_test=True)
+        print(f'Num of examples to test : {num_examples_to_test} | Actual batch size of test data : {len(batch_dicts)}')
         
         actual_examples_tested = 0
         for idx in range(num_examples_to_test-1):
