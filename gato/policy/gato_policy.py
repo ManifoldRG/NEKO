@@ -51,7 +51,7 @@ class GatoPolicy(nn.Module):
 
         self.context_len = context_len
         self.pad_seq = pad_seq
-        self.text_tokens = 50257 # gpt2
+        self.text_tokens = 50257 # gpt2 # todo - hardcoded fix.
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens

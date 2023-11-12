@@ -5,7 +5,7 @@ import numpy as np
 import math
 from torch.nn import functional as F
 from torch import nn
-from typing import List
+from typing import List,Dict
 from transformers import AutoTokenizer, GPT2Tokenizer
 import torch
 import copy
@@ -26,11 +26,10 @@ class TextTask(Task):
             self.text_dataset = concatenate_datasets(text_datasets_list)
 
         
-    def sample_batch(self, batch_size, is_test=False):
-        """gets used while training..."""
-        # todo - i. remove batch_size*10 ; ii. 
+    def sample_batch(self, batch_size, is_test=False)->List[Dict]:
+        """gets used while training...every step you need to fetch batch_size jitne examples."""
         partition = 'train' if not is_test else 'test'
-        random_indices = np.random.randint(0, len(self.text_dataset[partition]), size=batch_size*10)
+        random_indices = np.random.randint(0, len(self.text_dataset[partition]), size=batch_size)
         tokenized_outputs = self.text_tokenizer(self.text_dataset[partition][random_indices]['text'], truncation=True,
             max_length=self.context_length,
             return_overflowing_tokens=True,
@@ -88,26 +87,30 @@ class TextTask(Task):
         batch_dicts = self.sample_batch(num_examples_to_test, is_test=True)
         
         actual_examples_tested = 0
-        for idx in range(num_examples_to_test):
+        for idx in range(num_examples_to_test-1):
             batch_dict = batch_dicts[idx]
-            # todo - hardcoded 8 and 9 does not make sense
-            if len(batch_dict['text']) < 9:
-                continue
-            input_tokens, target_tokens = self.sample_chunk(torch.Tensor(batch_dict['text']).long().unsqueeze(0), 8)
+            
+            # Split the tokens into input and target tokens
+            tokens = batch_dict['text']
+            ith_position = np.random.randint(1, len(tokens))
+            input_tokens = tokens[:ith_position]
+            target_tokens = tokens[ith_position:]
+
+            # input_tokens, target_tokens = self.sample_chunk(torch.Tensor(batch_dict['text']).long().unsqueeze(0), 8)
             new_batch_dict = copy.deepcopy(batch_dict)
-            new_batch_dict['text'] = input_tokens.squeeze()
+            new_batch_dict['text'] = input_tokens
 
             # Generate prediction
             # todo - max_length should not be 20. More dynamic.
-            pred_logits, pred_tokens = model.predict_text(new_batch_dict, max_length=20, deterministic=deterministic)
+            pred_logits, pred_tokens = model.predict_text(new_batch_dict, max_length=len(target_tokens), deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 # todo - remove debug statements
-                print(f'Text Example : {tokenizer.decode(batch_dict["text"])} \n Input passed to model : {tokenizer.decode(new_batch_dict["text"].squeeze())} \n Predicted output : {tokenizer.decode(pred_tokens.squeeze())}')
+                print(f'Text Example : {tokenizer.decode(batch_dict["text"])} \n Input passed to model : {tokenizer.decode(new_batch_dict["text"])} \n Predicted output : {tokenizer.decode(pred_tokens.squeeze())}')
                 print("----")
 
             # Calculate loss
-            target_tokens = target_tokens.squeeze()
-            loss = loss_fn(pred_logits[:len(target_tokens), :], target_tokens.to(model.device))
+            target_tokens = torch.Tensor(target_tokens).long()
+            loss = loss_fn(pred_logits, target_tokens.to(model.device))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
             actual_examples_tested += 1
