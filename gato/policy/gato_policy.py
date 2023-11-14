@@ -416,47 +416,85 @@ class GatoPolicy(nn.Module):
                 token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
 
-    def predict_text(self, batch_dict, max_length=20, deterministic=True):
-        """For a single text example, generate prediction (future text)"""
+    # def predict_text(self, batch_dict, max_length=20, deterministic=True):
+    #     """For a single text example, generate prediction (future text)"""
         
-        concat_probs = None
-        concat_pred_tokens = None
-        continuous_input_batch_dict = deepcopy(batch_dict)
+    #     concat_probs = None
+    #     concat_pred_tokens = None
+    #     continuous_input_batch_dict = deepcopy(batch_dict)
 
-        for _ in range(max_length):
-            token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([continuous_input_batch_dict])
+    #     for _ in range(max_length):
+    #         token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([continuous_input_batch_dict])
             
+            
+    #         logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
+    #         next_token_logits = logits[:, -1, :]  # Get logits for the next token            
+            
+    #         # extract valid logits from last timestep
+    #         logits = logits[0, -1, start_token:(end_token+1)]
+    #         # Select the next token
+    #         if deterministic:
+    #             next_token = torch.argmax(probs, dim=-1).unsqueeze(0)
+    #         else:
+    #             probs = F.softmax(next_token_logits, dim=-1)
+    #             next_token = torch.multinomial(probs, num_samples=1)
+            
+    #         if concat_probs is None:
+    #             concat_probs = probs
+    #             concat_pred_tokens = next_token
+    #         else:
+    #             concat_probs = torch.cat([concat_probs, probs], dim=0)
+    #             concat_pred_tokens = torch.cat([concat_pred_tokens, next_token], dim=-1)
+
+    #         # Concatenate the next token to the input_ids so it gets used to build token embeddings again
+    #         input_tokens = torch.cat([input_tokens, next_token], dim=-1)
+            
+    #         continuous_input_batch_dict['text'] = list(input_tokens.cpu().squeeze().numpy())
+    #         # input_text = self.text_tokenizer.decode(input_tokens.squeeze())
+
+    #         # Stop generating tokens if the eos_token_id is generated
+    #         if next_token.item() == self.text_tokenizer.eos_token_id:
+    #             break
+
+    #     return concat_probs, concat_pred_tokens
+
+    def predict_text(self, batch_dict, max_length=20, deterministic=True):
+        action_str = 'text'
+        start_token = self.token_starts[action_str]
+        end_token = self.token_ends[action_str]
+        
+        token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
+        concat_logits = None
+        predicted_tokens = []
+        
+        # predict tokens, sampling or deterministically picking best token
+        for i in range(max_length):
             logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
-            next_token_logits = logits[:, -1, :]  # Get logits for the next token
-            
-            probs = F.softmax(next_token_logits, dim=-1)
-            
-            # Select the next token
+            # extract valid logits - just logits for last token (timestep)
+            logits = logits[0, -1, start_token:(end_token+1)]
+            if concat_logits is None:
+                concat_logits = logits.unsqueeze(0)
+            else:
+                concat_logits = torch.cat([concat_logits, logits.unsqueeze(0)], dim=0)
+
             if deterministic:
-                next_token = torch.argmax(probs, dim=-1).unsqueeze(0)
+                token = torch.argmax(logits, dim=-1)
             else:
-                next_token = torch.multinomial(probs, num_samples=1)
-            
-            if concat_probs is None:
-                concat_probs = probs
-                concat_pred_tokens = next_token
-            else:
-                concat_probs = torch.cat([concat_probs, probs], dim=0)
-                concat_pred_tokens = torch.cat([concat_pred_tokens, next_token], dim=-1)
+                # sample from logits
+                probs = torch.nn.functional.softmax(logits, dim=-1)
+                token = torch.multinomial(probs, num_samples=1)[0]
+            token = token + start_token
 
-            # Concatenate the next token to the input_ids so it gets used to build token embeddings again
-            input_tokens = torch.cat([input_tokens, next_token], dim=-1)
-            
-            continuous_input_batch_dict['text'] = list(input_tokens.cpu().squeeze().numpy())
-            # input_text = self.text_tokenizer.decode(input_tokens.squeeze())
-
-            # Stop generating tokens if the eos_token_id is generated
-            if next_token.item() == self.text_tokenizer.eos_token_id:
-                break
-
-        return concat_probs, concat_pred_tokens
-
-
+            # append to token_embeddings and token_masks
+            token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
+            new_embedding = self.embed_token(token) # check shape of new_emebddingss
+            token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
+            # and trim to context len
+            token_embeddings = token_embeddings[:, -self.context_len:, :]
+            token_masks = token_masks[:, -self.context_len:]
+            predicted_tokens.append(token)
+        
+        return concat_logits, predicted_tokens
 
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
@@ -484,7 +522,6 @@ class GatoPolicy(nn.Module):
         token_embeddings, _, _, token_masks = self.tokenize_input_dicts([input])
 
         # remove last action_tokens tokens, which are padding
-
         token_embeddings = token_embeddings[:, :-action_tokens, :]
         token_masks = token_masks[:, :-action_tokens]
 
