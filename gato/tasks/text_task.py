@@ -28,7 +28,7 @@ class TextTask(Task):
         
     def sample_batch(self, batch_size, is_test=False)->List[Dict]:
         """gets used while training...every step you need to fetch batch_size jitne examples."""
-        partition = 'train' if not is_test else 'test'
+        partition = 'train' if not is_test else 'train'
         random_indices = np.random.randint(0, len(self.text_dataset[partition]), size=batch_size)
         tokenized_outputs = self.text_tokenizer(self.text_dataset[partition][random_indices]['text'], truncation=True,
             max_length=self.context_length,
