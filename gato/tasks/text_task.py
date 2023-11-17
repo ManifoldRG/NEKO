@@ -17,7 +17,7 @@ class TextTask(Task):
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         text_datasets_list = []
         for text_dataset in dataset_names:
-            text_datasets_list.append(load_dataset(path='text_dataset', name=text_dataset))
+            text_datasets_list.append(load_dataset(path=text_dataset, name=text_dataset))
         if len(text_datasets_list) == 1:
             self.text_dataset = text_datasets_list[0]
         else:            
