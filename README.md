@@ -55,6 +55,12 @@ docker run -it --mount "type=bind,source=$(pwd),target=/app/gato-control" --entr
 # Training
 Below are some example training commands. 
 
+Training on Text Dataset (e.g. wikitext from huggingface):
+```bash
+python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=20 --batch_size=16 --sequence_length=1024 --eval_episodes=10 --activation_fn=gelu --save_model --save_mode=checkpoint --text_prop=1.0 --eval_text_log_examples --text_datasets=wikitext-2-v1 --text_datasets_paths=wikitext --use_wandb --pretrained_lm=gpt2 --disable_cosine_decay
+```
+example run log: https://wandb.ai/bhavul/gato-control/runs/jgqxfzxn/overview?workspace=user-bhavul
+
 Training on 3 MuJoCo locomotion tasks:
 ```bash
 python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=100000 --log_eval_freq=10000 --warmup_steps=10000 --batch_size=32 -k=240 --eval_episodes=10 --activation_fn=gelu --save_model --save_mode=checkpoint --control_datasets d4rl_halfcheetah-expert-v2 d4rl_hopper-expert-v2 d4rl_walker2d-expert-v2 -w
