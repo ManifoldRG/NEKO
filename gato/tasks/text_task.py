@@ -14,10 +14,10 @@ class TextTask(Task):
     def __init__(self, task_type, dataset_names:List[str], context_length:int, tokenizer_model:str):
         super().__init__(task_type)
         self.context_length = context_length
-        self.text_tokenizer = AutoTokenizer.from_pretrained('gpt2') # todo : remove hardcoded
+        self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         text_datasets_list = []
         for text_dataset in dataset_names:
-            text_datasets_list.append(load_dataset(path='wikitext', name=text_dataset))
+            text_datasets_list.append(load_dataset(path='text_dataset', name=text_dataset))
         if len(text_datasets_list) == 1:
             self.text_dataset = text_datasets_list[0]
         else:            
@@ -27,8 +27,8 @@ class TextTask(Task):
 
         
     def sample_batch(self, batch_size, is_test=False)->List[Dict]:
-        """gets used while training...every step you need to fetch batch_size jitne examples."""
-        partition = 'train' if not is_test else 'train'
+        """Gets called during training and test both, fetch as many examples as batch_size param."""
+        partition = 'train' if not is_test else 'test'
         random_indices = np.random.randint(0, len(self.text_dataset[partition]), size=batch_size)
         tokenized_outputs = self.text_tokenizer(self.text_dataset[partition][random_indices]['text'], truncation=True,
             max_length=self.context_length,
@@ -38,12 +38,11 @@ class TextTask(Task):
         batch_dicts = []
         count = 0 
         # todo - ii. vectorize this? Also do we wanna impose any length constraint?
-        # this mechanism is lossy right now as it only picks up long text examples which have full context length
-        # we can fix this but requires fixes in padding as well
         for length, input_ids in zip(tokenized_outputs["length"], tokenized_outputs["input_ids"]):
+            # we only pick non-empty string examples right now
             if length > 0:
                 batch_example_dict = {
-                    'text': input_ids,  # list of tokens
+                    'text': input_ids,  # A list of tokens
                     'images': None,
                     'continuous_obs': None,
                     'discrete_obs': None,
@@ -56,20 +55,6 @@ class TextTask(Task):
                     break
         
         return batch_dicts
-
-    def sample_chunk(self, chunk, seq_len):
-        if chunk.shape[1] == seq_len + 1:
-            start_idx = 0
-        elif chunk.shape[1] > seq_len + 1:
-            start_idx = torch.randint(0, chunk.shape[1] - seq_len + 1, (1,)).item()
-        else:
-            raise Exception(f"Invalid sequence length: Sequence length {seq_len} > {chunk.shape[1]} Chunk size")
-
-        # todo - the if/else logic at the beginning should be respected
-        start_idx = torch.randint(0, chunk.shape[1] - seq_len + 1, (1,)).item()
-        inputs = chunk[:, start_idx:start_idx+seq_len-1]
-        targets = chunk[:, start_idx+1:start_idx+seq_len]
-        return inputs, targets
         
     def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):
         tokenizer = model.text_tokenizer
@@ -97,15 +82,13 @@ class TextTask(Task):
             input_tokens = tokens[:ith_position]
             target_tokens = tokens[ith_position:]
 
-            # input_tokens, target_tokens = self.sample_chunk(torch.Tensor(batch_dict['text']).long().unsqueeze(0), 8)
             new_batch_dict = copy.deepcopy(batch_dict)
             new_batch_dict['text'] = input_tokens
 
             # Generate prediction
-            # todo - max_length should not be 20. More dynamic.
             pred_logits, pred_tokens = model.predict_text(new_batch_dict, max_length=len(target_tokens), deterministic=deterministic)
-            if log_examples_to_output and idx%30==0:
-                # todo - remove debug statements
+            # todo: pull 50 into a CLI argument in train.py
+            if log_examples_to_output and idx%50==0:
                 print(f'Text Example : {tokenizer.decode(batch_dict["text"])} \n Input passed to model : {tokenizer.decode(new_batch_dict["text"])} \n Predicted output : {tokenizer.decode(pred_tokens)}')
                 print("----")
 

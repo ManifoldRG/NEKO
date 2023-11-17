@@ -52,7 +52,7 @@ class GatoPolicy(nn.Module):
 
         self.context_len = context_len
         self.pad_seq = pad_seq
-        self.text_tokens = 50257 # gpt2 # todo - hardcoded fix.
+        # note : text tokens are defined below since they utilise HF Tokenizer initiation  
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
@@ -120,6 +120,7 @@ class GatoPolicy(nn.Module):
 
         # Tokenizers
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_name)
+        self.text_tokens = self.text_tokenizer.vocab_size 
 
         self.continuous_action_tokenizer = ContinuousTokenizer(
             use_mu_law=False, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']
@@ -166,17 +167,16 @@ class GatoPolicy(nn.Module):
 
         if compute_loss:
             # obtain target tokens, and pad
-            # WARN - COULD THIS HAVE AN ERROR?? Verify. Try "1:"" as the second dimension.
-            loss_logits = logits[:, :-1, :] # pick out the probability/logit for very last token [4,95,52305] -> [4,94,52305]
-            token_masks = token_masks[:, :-1] # whether originating token is valid  (remove last token from mask) [4,95] -> [4,94]
+            loss_logits = logits[:, :-1, :] # pick out the probability/logit for very last token 
+            token_masks = token_masks[:, :-1] # whether originating token is valid  (remove last token from mask) 
 
-            token_target_masks = token_target_masks[:, 1:] # whether target token is valid | [4,95] -> [4,94] (but keep from 2nd to last token)
-            loss_masks = token_masks * token_target_masks  # make sure we compute the masks | [4,94]
-            target_tokens = tokens[:, 1:] # [4,94]
+            token_target_masks = token_target_masks[:, 1:]  # whether target token is valid
+            loss_masks = token_masks * token_target_masks  
+            target_tokens = tokens[:, 1:] 
 
-            loss_masks = loss_masks.reshape(-1) # [376]
-            loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0] # first part turns it into [376,52305]; then second part of loss_masks>0 -> [214,52305]
-            target_tokens = target_tokens.reshape(-1)[loss_masks > 0]       # first part turns into [376]; then second part of loss_masks>0 -> [214]
+            loss_masks = loss_masks.reshape(-1) 
+            loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0] 
+            target_tokens = target_tokens.reshape(-1)[loss_masks > 0]       
             loss = torch.nn.functional.cross_entropy(loss_logits, target_tokens)
             if 'pdb' in kwargs and kwargs['pdb']:
                 import pdb; pdb.set_trace()
@@ -415,48 +415,6 @@ class GatoPolicy(nn.Module):
                 token_target_masks = torch.cat([token_target_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
                 token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
         return token_embeddings, tokens, token_target_masks, token_masks
-
-    # def predict_text(self, batch_dict, max_length=20, deterministic=True):
-    #     """For a single text example, generate prediction (future text)"""
-        
-    #     concat_probs = None
-    #     concat_pred_tokens = None
-    #     continuous_input_batch_dict = deepcopy(batch_dict)
-
-    #     for _ in range(max_length):
-    #         token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([continuous_input_batch_dict])
-            
-            
-    #         logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
-    #         next_token_logits = logits[:, -1, :]  # Get logits for the next token            
-            
-    #         # extract valid logits from last timestep
-    #         logits = logits[0, -1, start_token:(end_token+1)]
-    #         # Select the next token
-    #         if deterministic:
-    #             next_token = torch.argmax(probs, dim=-1).unsqueeze(0)
-    #         else:
-    #             probs = F.softmax(next_token_logits, dim=-1)
-    #             next_token = torch.multinomial(probs, num_samples=1)
-            
-    #         if concat_probs is None:
-    #             concat_probs = probs
-    #             concat_pred_tokens = next_token
-    #         else:
-    #             concat_probs = torch.cat([concat_probs, probs], dim=0)
-    #             concat_pred_tokens = torch.cat([concat_pred_tokens, next_token], dim=-1)
-
-    #         # Concatenate the next token to the input_ids so it gets used to build token embeddings again
-    #         input_tokens = torch.cat([input_tokens, next_token], dim=-1)
-            
-    #         continuous_input_batch_dict['text'] = list(input_tokens.cpu().squeeze().numpy())
-    #         # input_text = self.text_tokenizer.decode(input_tokens.squeeze())
-
-    #         # Stop generating tokens if the eos_token_id is generated
-    #         if next_token.item() == self.text_tokenizer.eos_token_id:
-    #             break
-
-    #     return concat_probs, concat_pred_tokens
 
     def predict_text(self, batch_dict, max_length=20, deterministic=True):
         action_str = 'text'

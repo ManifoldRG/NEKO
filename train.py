@@ -49,7 +49,7 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.sequence_length, tokenizer_model='gpt2')) # todo - remove hardcoding
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 
