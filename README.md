@@ -8,11 +8,7 @@ This implementation is currently in progress.
 
 The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
 
-Ultimately, collective high performance across many objectives in varied modalities constitutes a SoTA direction. We hope that in building such models and making them open source, we can move humanity’s collective understanding and capability in building complex AI systems forward.
-
-Practically, building these systems provides us deeper understanding into the utility and mechanics of modern deep learning approaches in building better representational capability and scaling to new problem domains. Put another way, this research direction serves as an excellent foundation to test other, new kinds of general AI approaches to build next generation learning systems. 
-
-## [NEKO Project Roadmap](https://docs.google.com/document/d/e/2PACX-1vQ2JVJvSiYmwjDFnppj0_38NCUEdLG8pAdj0Q2tSy1yy4wwQxJOAAzNFwz2Is4TONhgUVnvJzuu5o85/pub)
+## [NEKO Project Roadmap](https://docs.google.com/document/d/e/2PACX-1vQELDXCIT9tn7Uq5vxQG4_3HsrkQcuBRqvXm-MkxW06Zkh-LP3G9z7TP7a-2MNWyA/pub)
 
 ## [NEKO Open Issues and Tasks](https://github.com/orgs/ManifoldRG/projects/12)
 
@@ -39,7 +35,7 @@ cd ..
 python ./gato/data/download_custom_datasets.py
 ```
 
-(this will only download MuJoCo datasets, but refer to file for downloading others like [Breakout](https://drive.google.com/drive/folders/1Elos7A-NbpDzr5bPpPmoM-_2qY_68KFi?usp=drive_link))
+(this will only download MuJoCo datasets, but refer to file for downloading others like [Breakout](https://drive.google.com/drive/folders/1cFGsa1uLr6VrbpkHuL9NiEohgcch7r0k?usp=sharing))
 
 ## Docker
 
@@ -153,7 +149,7 @@ logits, loss = model([
 
 # Pretrained models
 
-We provide some pretrained models, which are not geared for high-performance or reliable external use, but to aid in our open-source development. These can be found for [3 MuJoCo tasks](https://drive.google.com/drive/folders/1hws2ip5SKU6KLOVfRU_N8GNPTHPkxVLP?usp=sharing) and [Breakout](https://drive.google.com/drive/folders/1qzUaY6Qh_MmS8o0EqDw3OL55H3Yn6yxe?usp=sharing). Other models may be added [here](https://drive.google.com/drive/folders/1xVo462ZAs54DxsYTsp7NxmCGvrGVBMFj?usp=sharing) where the directory contains checkpoints, arguments, and link to WandB run in each info.txt.
+We provide some pretrained models, which are not geared for high-performance or reliable external use, but to aid in our open-source development. These can be found for [3 MuJoCo tasks](https://drive.google.com/drive/folders/1DTGskCFq36nnTvjIs6vsoHw-E8wEiZ8Y?usp=sharing) and [Breakout](https://drive.google.com/drive/folders/1cFGsa1uLr6VrbpkHuL9NiEohgcch7r0k?usp=sharing). Other models may be added [here](https://drive.google.com/drive/folders/1eJWk4hYRlWlwqq-IsBXZ90DvZvirzH0F?usp=sharing) where the directory contains checkpoints, arguments, and link to WandB run in each info.txt.
 
 # Future
 Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/misc/todo.md). We are working on adding modular tasks, check out the Issues tab.
