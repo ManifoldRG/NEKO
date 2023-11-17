@@ -11,13 +11,14 @@ import torch
 import copy
 class TextTask(Task): 
        
-    def __init__(self, task_type, dataset_names:List[str], context_length:int, tokenizer_model:str):
+    def __init__(self, task_type, dataset_names:List[str], dataset_paths:List[str], context_length:int, tokenizer_model:str):
         super().__init__(task_type)
         self.context_length = context_length
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         text_datasets_list = []
-        for text_dataset in dataset_names:
-            text_datasets_list.append(load_dataset(path=text_dataset, name=text_dataset))
+        assert len(dataset_names) == len(dataset_paths), "The dataset names and paths parameters should have corresponding values and hence equal lengths"
+        for i, text_dataset in enumerate(dataset_names):
+            text_datasets_list.append(load_dataset(path=dataset_paths[i], name=text_dataset))
         if len(text_datasets_list) == 1:
             self.text_dataset = text_datasets_list[0]
         else:            

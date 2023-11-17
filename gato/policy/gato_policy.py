@@ -52,7 +52,12 @@ class GatoPolicy(nn.Module):
 
         self.context_len = context_len
         self.pad_seq = pad_seq
-        # note : text tokens are defined below since they utilise HF Tokenizer initiation  
+        
+        # Text Tokenizer
+        self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_name)
+        
+        # tokens
+        self.text_tokens = self.text_tokenizer.vocab_size 
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
@@ -117,10 +122,8 @@ class GatoPolicy(nn.Module):
         self.predict_token = nn.Linear(embed_dim, self.vocab_size, bias=False)
 
         self.separator_token = nn.Parameter(torch.zeros(embed_dim))
-
-        # Tokenizers
-        self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_name)
-        self.text_tokens = self.text_tokenizer.vocab_size 
+        
+        # Control Tokenizers
 
         self.continuous_action_tokenizer = ContinuousTokenizer(
             use_mu_law=False, mu=mu, M=M, n_bins=self.continuous_tokens, offset=self.token_starts['continuous']

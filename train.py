@@ -49,7 +49,7 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 
@@ -219,6 +219,7 @@ if __name__ == '__main__':
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
     parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
+    parser.add_argument('--text_datasets_paths', type=str, nargs='+', default=[]) # ['wikitext']
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
