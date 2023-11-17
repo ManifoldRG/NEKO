@@ -6,7 +6,7 @@ This implementation is currently in progress.
 
 ## Vision
 
-The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
+The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://web.archive.org/web/20231005220217/https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
 
 ## [NEKO Project Roadmap](https://docs.google.com/document/d/e/2PACX-1vQELDXCIT9tn7Uq5vxQG4_3HsrkQcuBRqvXm-MkxW06Zkh-LP3G9z7TP7a-2MNWyA/pub)
 
