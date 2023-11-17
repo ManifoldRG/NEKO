@@ -1,2 +1,5 @@
 .vscode/
 __pycache__
+*.pt
+args.json
+wandb/
