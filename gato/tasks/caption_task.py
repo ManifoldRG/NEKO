@@ -16,9 +16,10 @@ from torch.nn import functional as F
 from torch import nn
 import json
 import random
+from transformers import AutoTokenizer, GPT2Tokenizer
 
 class CaptionTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, caption_dataset, train_data, test_data = [],
+    def __init__(self, task_type: TaskTypeEnum, tokenizer_model:str, caption_dataset, train_data, test_data = [],
                  test_data_prop = 0.1, test_data_mask_file = None):
         """
         task_type should be CAPTION
@@ -36,12 +37,13 @@ class CaptionTask(Task):
         And this mask keeps track of the indices of test data in the dataset.  
         """
         super().__init__(task_type)
-        self.dataset = {}
 
         if not caption_dataset.endswith('/'):
             caption_dataset = caption_dataset + '/'
 
         assert len(train_data) > 0, "Must provide train datasets for caption task" 
+        self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
+        self.dataset = {}
         
         if len(test_data) > 0: # Note: len(train_data_directories)>0 also holds due to the abpve-mentioned assert
             self.dataset['train'] = self.process_data(caption_dataset, train_data)
@@ -109,15 +111,13 @@ class CaptionTask(Task):
         for item in selected_examples:
             batch_dict = {
                 'images': item['image'],
-                'text': item['text']
+                'text':self.text_tokenizer.encode(item['text'])
             }
             batch_dicts.append(batch_dict)
 
         return batch_dicts
 
-    # The following function reuses some code from the evaluate() function defined for text task. Eventually, it will be the 
-    # best if the common code between the two evaluate() functions can be defined in one function and reused by both
-    def evaluate(self, model, num_examples_to_test=100, deterministic=True, log_examples_to_output=False):    
+    def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):    
         tokenizer = model.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0
@@ -159,7 +159,7 @@ class CaptionTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directory with your data directory
-    task = CaptionTask(task_type = 'caption', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
+    task = CaptionTask(task_type = 'caption', tokenizer_model = 'gpt2', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
                        train_data = ['train'], test_data = ['test'], test_data_prop = 0.1)
 
     #print(task.dataset["train"][4]["images"][0][1][10])

@@ -12,9 +12,11 @@ from torch.nn import functional as F
 from torch import nn
 import json
 import random
+from transformers import AutoTokenizer, GPT2Tokenizer
 
 class VqaTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, vqa_dataset, train_data, test_data, 
+    def __init__(self, task_type: TaskTypeEnum, tokenizer_model:str,
+                 vqa_dataset, train_data, test_data, 
                  train_img_name_prefix, train_img_file_name_len, 
                  test_img_name_prefix, test_img_file_name_len,
                  questions_file, annotations_file):
@@ -33,6 +35,7 @@ class VqaTask(Task):
 
         assert len(train_data) == len(test_data), "Number of training data and test data sub director must be equal to each other" 
 
+        self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         self.dataset = {}
         if not vqa_dataset.endswith('/'):
             vqa_dataset = vqa_dataset + '/'
@@ -97,12 +100,12 @@ class VqaTask(Task):
             batch_dict = {
                 'images': item['image'],
                 # 'text' is to concat the question and a randomly chosen answer with a space in between
-                'text': item['question'] + ' ' + item['answers'][answer_idx]['answer'] 
+                'text': self.text_tokenizer.encode(item['question'] + ' ' + item['answers'][answer_idx]['answer']) 
             }
             batch_dicts.append(batch_dict)
         return batch_dicts
 
-    def evaluate(self, model, num_examples_to_test=100, deterministic=True, log_examples_to_output=False):    
+    def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):    
         tokenizer = model.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0

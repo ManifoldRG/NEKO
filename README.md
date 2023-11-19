@@ -6,7 +6,7 @@ This implementation is currently in progress.
 
 ## Vision
 
-The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
+The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://web.archive.org/web/20231005220217/https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
 
 ## [NEKO Project Roadmap](https://docs.google.com/document/d/e/2PACX-1vQELDXCIT9tn7Uq5vxQG4_3HsrkQcuBRqvXm-MkxW06Zkh-LP3G9z7TP7a-2MNWyA/pub)
 
@@ -50,6 +50,12 @@ docker run -it --mount "type=bind,source=$(pwd),target=/app/gato-control" --entr
 
 # Training
 Below are some example training commands. 
+
+Training on Text Dataset (e.g. wikitext from huggingface):
+```bash
+python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=20 --batch_size=16 --sequence_length=1024 --eval_episodes=10 --activation_fn=gelu --save_model --save_mode=checkpoint --text_prop=1.0 --eval_text_log_examples --text_datasets=wikitext-2-v1 --text_datasets_paths=wikitext --use_wandb --pretrained_lm=gpt2 --disable_cosine_decay
+```
+example run log: https://wandb.ai/bhavul/gato-control/runs/jgqxfzxn/overview?workspace=user-bhavul
 
 Training on 3 MuJoCo locomotion tasks:
 ```bash

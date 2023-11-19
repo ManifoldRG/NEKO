@@ -52,20 +52,21 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets))
+        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
  
     if len(args.caption_dataset) > 0:
         # add caption datasets
-        tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.caption_dataset, args.caption_train_data, args.caption_test_data, args.test_data_prop))
+        tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.tokenizer_model_name, 
+                                 args.caption_dataset, args.caption_train_data, args.caption_test_data, args.test_data_prop))
     else:
         assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
     
     if len(args.vqa_dataset) > 0:
         # add vqa datasets
-        tasks.append(VqaTask(TaskTypeEnum.VQA.value, args.vqa_dataset, 
-                             args.vqa_train_data, args.vqa_test_data, 
+        tasks.append(VqaTask(TaskTypeEnum.VQA.value, args.tokenizer_model_name, 
+                             args.vqa_dataset, args.vqa_train_data, args.vqa_test_data, 
                              args.train_img_name_prefix, args.train_img_file_name_len, 
                              args.test_img_name_prefix, args.test_img_file_name_len, 
                              args.questions_file, args.annotations_file))
@@ -140,7 +141,6 @@ def main(args):
     # Create save dir if does not exist
     if args.save_model and not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-
     trainer = Trainer(
         model = model,
         optimizer = optimizer,
@@ -243,6 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
 
     parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
+    parser.add_argument('--text_datasets_paths', type=str, nargs='+', default=[]) # ['wikitext']
 
     parser.add_argument('--caption_dataset', type=str, default='') # the directory for all of the data (training and test)
     parser.add_argument('--caption_train_data', type=str, nargs='+', default=[]) # list of sub directories for training data
