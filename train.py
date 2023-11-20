@@ -150,7 +150,6 @@ def main(args):
         exp_name = exp_name,
         args=args
     )
-
     trainer.train()
 
 

@@ -126,11 +126,29 @@ class Trainer:
         # Build training batch
         start_time = time.time()
 
-        # Calculate text and control batch sizes based on text_prop
+        # Calculate batch size for each task, the following need to be revised to including more new tasks
+        control_prop = 1-self.args.text_prop-self.args.caption_prop-self.args.vqa_prop
         text_batch_size = int(self.args.text_prop * self.args.batch_size)
         caption_batch_size = int(self.args.caption_prop * self.args.batch_size)
         vqa_batch_size = int(self.args.vqa_prop * self.args.batch_size)
-        control_batch_size = self.args.batch_size - text_batch_size - caption_batch_size - vqa_batch_size
+        control_batch_size = int(control_prop*self.args.batch_size)
+
+        remainder = self.args.batch_size - text_batch_size - caption_batch_size - vqa_batch_size - control_batch_size
+
+        if remainder > 0: 
+            # if this happens, we dispense the remainder to the task drawn from a multinomial distribution based off the following residulas
+            # over the long run of trainig steps, the remainder dispensing will be proporttional to the amount of residuals
+            residuals = [self.args.text_prop * self.args.batch_size - text_batch_size, self.args.caption_prop * self.args.batch_size - caption_batch_size,
+                         self.args.vqa_prop * self.args.batch_size - vqa_batch_size, control_prop*self.args.batch_size - control_batch_size]
+            idx = torch.multinomial(torch.tensor(residuals), num_samples=1).item()
+            residuals = [0]*len(residuals)
+            residuals[idx] = remainder
+            text_batch_size = text_batch_size + residuals[0]
+            caption_batch_size = caption_batch_size + residuals[1]
+            vqa_batch_size = vqa_batch_size + residuals[2]
+            control_batch_size = control_batch_size + residuals[3]
+        assert self.args.batch_size == text_batch_size + caption_batch_size + vqa_batch_size + control_batch_size, "Total atch size is not eqaual to the sum of each task's batch size" 
+
         text_batch_dicts = []
         caption_batch_dicts = []
         vqa_batch_dicts = []
@@ -149,6 +167,7 @@ class Trainer:
         # Combine the batches
         combined_batch_dicts = text_batch_dicts + caption_batch_dicts + vqa_batch_dicts+ control_batch_dicts
 
+
         logs['time/sample_batch'] = time.time() - start_time
         with self.accelerator.accumulate(self.model):
             # Compute loss and update model
@@ -161,6 +180,7 @@ class Trainer:
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
+
         return loss.detach().cpu().item(), logs
 
     def sample_text_batch(self, batch_size):
