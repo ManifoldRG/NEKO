@@ -148,7 +148,8 @@ class VqaTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directories and files names with your directories and files
-    task = VqaTask(task_type                = 'vqa', 
+    task = VqaTask(task_type                = TaskTypeEnum.VQA,
+                   tokenizer_model          = 'gpt2',
                    vqa_dataset              = '/home/<user name>/Git/NEKO/VQA_Data/',
                    train_data               = ['train2014'], 
                    test_data                = ['val2014'],

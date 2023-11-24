@@ -10,7 +10,7 @@ class TaskTypeEnum(Enum):
     # add more as we add more modalities
 
 class Task(ABC):
-    def __init__(self, task_type: str):
+    def __init__(self, task_type: TaskTypeEnum):
         if task_type not in TaskTypeEnum._value2member_map_:
             raise ValueError(f"'type' must be one of {', '.join([e.value for e in TaskTypeEnum])}")
         self.task_type = task_type
