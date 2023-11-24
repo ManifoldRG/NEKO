@@ -59,12 +59,14 @@ class VqaTask(Task):
                     annotations = json.load(json_file)['annotations'] 
             except:
                 print(f"{data_directory} does not have a questions json file, or it is not named as annotations.json")
+                exit(1)
 
             try:
                 with open(data_directory + questions_file, 'r') as json_file:
                     questions = json.load(json_file)['questions'] # This is a list of question IDs and the corresponding questions
             except:
                 print(f"{data_directory} does not have an annotations json file, or it is not named as questions.json")
+                exit(1)
 
             assert len(annotations) == len(questions), "Number of annotations must be equal to number of questions" 
         
