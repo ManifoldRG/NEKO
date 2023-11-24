@@ -1,18 +1,14 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task, TaskTypeEnum
 
-import os
 from PIL import Image
-import io # need to use BytesIO
 
 import numpy as np
-import math
 import torch
-from torch.nn import functional as F
 from torch import nn
 import json
 import random
-from transformers import AutoTokenizer, GPT2Tokenizer
+from transformers import AutoTokenizer
 
 class VqaTask(Task): 
     def __init__(self, task_type: TaskTypeEnum, tokenizer_model:str,
