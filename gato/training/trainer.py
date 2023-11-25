@@ -165,7 +165,7 @@ class Trainer:
             control_batch_dicts = self.sample_control_batch(control_batch_size)
 
         # Combine the batches
-        combined_batch_dicts = text_batch_dicts + caption_batch_dicts + vqa_batch_dicts+ control_batch_dicts
+        combined_batch_dicts = text_batch_dicts + caption_batch_dicts + vqa_batch_dicts + control_batch_dicts
 
 
         logs['time/sample_batch'] = time.time() - start_time
@@ -185,22 +185,22 @@ class Trainer:
 
     def sample_text_batch(self, batch_size):
         batch_dicts = []
-        text_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.TEXT.value]
+        text_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.TEXT]
         for i,task in enumerate (text_tasks):
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
 
     def sample_caption_batch(self, batch_size):
         batch_dicts = []
-        caption_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CAPTION.value]
+        caption_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CAPTION]
         for i,task in enumerate (caption_tasks):
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
     
     def sample_vqa_batch(self, batch_size):
         batch_dicts = []
-        vqa_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.VQA.value]
-        for i,task in enumerate (vqa_tasks):
+        vqa_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.VQA]
+        for task in vqa_tasks:
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
 
@@ -208,7 +208,7 @@ class Trainer:
         batch_dicts = []
 
         sampled_task_indices = []
-        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL.value]
+        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL]
         n_tasks = len(control_tasks)
         while len(sampled_task_indices) < batch_size:
             max_n = min(n_tasks, batch_size - len(sampled_task_indices))

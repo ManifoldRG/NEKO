@@ -11,7 +11,7 @@ class TaskTypeEnum(Enum):
 
 class Task(ABC):
     def __init__(self, task_type: TaskTypeEnum):
-        if task_type not in TaskTypeEnum._value2member_map_:
+        if not isinstance(task_type, TaskTypeEnum):
             raise ValueError(f"'type' must be one of {', '.join([e.value for e in TaskTypeEnum])}")
         self.task_type = task_type
 

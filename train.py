@@ -20,7 +20,7 @@ from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
 from gato.tasks.caption_task import CaptionTask
-from gato.tasks.vqa_task import VqaTask
+from gato.tasks.arrow_vqa_task import VqaTask
 from gato.tasks.task import TaskTypeEnum
 
 
@@ -38,7 +38,7 @@ def main(args):
     envs, control_datasets = load_envs(args.control_datasets) # Load Minari datasets and corresponding Gym environments
     for env, dataset in zip(envs, control_datasets):
         task = ControlTask(
-            TaskTypeEnum.CONTROL.value,
+            TaskTypeEnum.CONTROL,
             env.unwrapped.spec.id,
             env,
             dataset,
@@ -52,24 +52,20 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
+        tasks.append(TextTask(TaskTypeEnum.TEXT, args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name))
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
  
     if len(args.caption_dataset) > 0:
         # add caption datasets
-        tasks.append(CaptionTask(TaskTypeEnum.CAPTION.value, args.tokenizer_model_name, 
+        tasks.append(CaptionTask(TaskTypeEnum.CAPTION, args.tokenizer_model_name,
                                  args.caption_dataset, args.caption_train_data, args.caption_test_data, args.test_data_prop))
     else:
         assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
     
     if len(args.vqa_dataset) > 0:
         # add vqa datasets
-        tasks.append(VqaTask(TaskTypeEnum.VQA.value, args.tokenizer_model_name, 
-                             args.vqa_dataset, args.vqa_train_data, args.vqa_test_data, 
-                             args.train_img_name_prefix, args.train_img_file_name_len, 
-                             args.test_img_name_prefix, args.test_img_file_name_len, 
-                             args.questions_file, args.annotations_file))
+        tasks.append(VqaTask(TaskTypeEnum.VQA, args.tokenizer_model_name, args.vqa_dataset))
     else:
         assert (args.vqa_prop == 0), 'vqa_prop must be 0 if no text datasets are specified'
 

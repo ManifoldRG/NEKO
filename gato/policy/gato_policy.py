@@ -336,6 +336,7 @@ class GatoPolicy(nn.Module):
                 else:
                     assert n_timesteps == discrete_action_tokens.shape[0], "number of timesteps must be the same for all modalities"
 
+            assert n_timesteps != None, "Expected n_timesteps to be set. What does your batch look like? Are you missing a required key?"
 
             separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim, device=self.device) * self.separator_token
             separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
