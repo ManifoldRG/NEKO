@@ -49,7 +49,7 @@ def main(args):
     env_names = []
     for env, dataset in zip(envs, datasets):
         task = ControlTask(
-            TaskTypeEnum.CONTROL.value,
+            TaskTypeEnum.CONTROL,
             env.unwrapped.spec.id, 
             env, 
             dataset,

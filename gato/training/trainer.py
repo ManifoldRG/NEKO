@@ -79,12 +79,12 @@ class Trainer:
         with torch.no_grad():
             for task in self.tasks:
                 eval_logs = {}
-                if task.task_type == TaskTypeEnum.CONTROL.value:
+                if task.task_type == TaskTypeEnum.CONTROL:
                     if self.args.eval_episodes > 0 :
                         eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/{task.name}/{k}'] = v
-                elif task.task_type == TaskTypeEnum.TEXT.value:
+                elif task.task_type == TaskTypeEnum.TEXT:
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
@@ -149,7 +149,7 @@ class Trainer:
 
     def sample_text_batch(self, batch_size):
         batch_dicts = []
-        text_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.TEXT.value]
+        text_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.TEXT]
         for i,task in enumerate (text_tasks):
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
@@ -158,7 +158,7 @@ class Trainer:
         batch_dicts = []
 
         sampled_task_indices = []
-        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL.value]
+        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL]
         n_tasks = len(control_tasks)
         while len(sampled_task_indices) < batch_size:
             max_n = min(n_tasks, batch_size - len(sampled_task_indices))
