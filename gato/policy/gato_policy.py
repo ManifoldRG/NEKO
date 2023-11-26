@@ -1,3 +1,4 @@
+from typing import Union
 import torch
 import torch.nn as nn
 import numpy as np
@@ -18,7 +19,7 @@ from copy import deepcopy
 class GatoPolicy(nn.Module):
     def __init__(
         self,
-        device: str,
+        device: Union[torch.device, str],
         embed_dim: int,
         layers: int,
         heads: int,

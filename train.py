@@ -24,8 +24,7 @@ from gato.tasks.task import TaskTypeEnum
 def main(args):
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
-    device = accelerator.device
-    args.device = accelerator.device
+    args.device = accelerator.device.type
 
     exp_id = random.randint(int(1e5), int(1e6) - 1)
     exp_name = f'neko-gato-{exp_id}'
@@ -133,6 +132,98 @@ def main(args):
     trainer.train()
 
 
+class Args(argparse.Namespace):
+    cpu: bool
+    mixed_precision: str
+
+    # Input & tokenization
+    sequence_length: int
+    patch_size: int
+    resid_mid_channels: int
+    num_groups: int
+    patch_position_vocab_size: int
+    disable_patch_pos_encoding: bool
+    disable_inner_pos_encoding: bool
+
+    mu: int
+    M: int
+
+    vocab_size: int
+    continuous_tokens: int
+    discrete_tokens: int
+
+    # transformer architecture hyperparameters
+    tokenizer_model_name: str
+    pretrained_lm: str
+    flash: bool
+    init_checkpoint: str
+
+    embed_dim: int
+    layers: int
+    heads: int
+    activation_fn: str
+    activation_fn: str
+
+    # PEFT hyperparameters
+    lora: bool
+    lora_r: int
+    lora_alpha: int
+    lora_dropout: float
+
+    # training hyperparameters
+    text_prop: float
+    gradient_accumulation_steps: int
+    batch_size: int
+    dropout: float
+
+    beta_1: float
+    beta_2: float
+    adam_eps: float
+    weight_decay: float
+
+    grad_norm_clip: float
+    disable_grad_clip: bool
+
+    warmup_steps: int
+    init_lr: float
+    learning_rate: float
+
+    min_factor: float
+    disable_cosine_decay: bool
+
+    training_steps: int
+    log_eval_freq: int
+
+    pad_seq: bool
+
+
+    # evaluation
+    eval_episodes: int
+    eval_mode: str
+    promptless_eval: bool
+    eval_text_num_examples: int
+    eval_text_log_examples: bool
+
+    # datasets / envs
+    control_datasets: str
+    text_datasets: str
+    text_datasets_paths: str
+
+    # params for sampling from datasets
+    prompt_ep_proportion: float
+    prompt_len_proportion: float
+    unique_prompt_episodes: bool
+    top_k: int
+
+    # logging
+    use_wandb: bool
+    wandb_project: str
+
+    # saving
+    save_model: bool
+    save_mode: str
+    save_dir: str
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -236,8 +327,8 @@ if __name__ == '__main__':
     parser.add_argument('--save_mode', type=str, default='last', choices=['checkpoint', 'last']) # Checkpoit saves model every after each log_eval_freq steps
     parser.add_argument('--save_dir', type=str, default='models')
 
-    args = parser.parse_args()
-    args = DotDict(vars(args))
+    ns = Args()
+    args = parser.parse_args(namespace=ns)
 
     # Checks
     assert args.training_steps % args.log_eval_freq == 0, 'training_steps must be divisible by eval_freq'

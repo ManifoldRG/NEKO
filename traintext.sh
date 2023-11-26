@@ -1,0 +1,19 @@
+python -m pdb train.py \
+    --embed_dim=768 \
+    --layers=6 \
+    --heads=24 \
+    --training_steps=1000 \
+    --log_eval_freq=10 \
+    --warmup_steps=20 \
+    --batch_size=16 \
+    --sequence_length=1024 \
+    --eval_episodes=10 \
+    --activation_fn=gelu \
+    --save_model \
+    --save_mode=checkpoint \
+    --text_prop=1.0 \
+    --eval_text_log_examples \
+    --text_datasets=wikitext-2-v1 \
+    --text_datasets_paths=wikitext \
+    --pretrained_lm=gpt2 \
+    --disable_cosine_decay
