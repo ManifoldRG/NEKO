@@ -1,4 +1,4 @@
-from utils.argparsing import Arg, ParseArger, Namespace
+from utils.argparsing import Arg, ParseArger, TypedNamespace
 import random
 import os
 
@@ -132,10 +132,10 @@ def main(args):
     trainer.train()
 
 
-class TrainArgs(Namespace):
+class TrainArgs(TypedNamespace):
     # Accelerate args
-    cpu = Arg[int]('--cpu', action='store_true', default=False)
-    Arg[str](
+    cpu = Arg[int]('--cpu', action='store_true', default=False, help='Force script to execute on CPU. Passed to Accelerator.')
+    mixed_precision = Arg[str](
         "--mixed_precision",
         type=str,
         default=None,
@@ -146,24 +146,24 @@ class TrainArgs(Namespace):
     )
 
     # Input & tokenization
-    sequence_length = Arg[int]('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
-    patch_size = Arg[int]('--patch_size', type=int, default=16) # image patch size
-    resid_mid_channels = Arg[int]('--resid_mid_channels', type=int, default=128) # number of channels in residual MLP
+    sequence_length = Arg[int]('--sequence_length', '-k', type=int, default=1024, help="Used as context_length in models and tokenizers.")
+    patch_size = Arg[int]('--patch_size', type=int, default=16, help="Images are reshaped to be a multiple of patch_size.")
+    resid_mid_channels = Arg[int]('--resid_mid_channels', type=int, default=128, help="Number of channels in residual MLP. (Passed as to `nn.Conv2d` as `out_channels`.)")
     num_groups = Arg[int]('--num_groups', type=int, default=32) # GroupNorm groups in ResNet
     patch_position_vocab_size = Arg[int]('--patch_position_vocab_size', type=int, default=128)
     disable_patch_pos_encoding = Arg[int]('--disable_patch_pos_encoding', action='store_true', default=False)
     disable_inner_pos_encoding = Arg[int]('--disable_inner_pos_encoding', action='store_true', default=False)
 
-    mu = Arg[int]('--mu','-mu', type=int, default=100) # mu-law encoding
+    mu = Arg[int]('--mu','-m', type=int, default=100) # mu-law encoding
     M = Arg[int]('--M', '-M', type=int, default=256)
 
     #vocab_size = Arg[int]('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
-    continuous_tokens = Arg[int]('--continuous_tokens', type=int, default=1024) # number of tokens for continuous values (e.g. actions, observations)
-    discrete_tokens = Arg[int]('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
+    continuous_tokens = Arg[int]('--continuous_tokens', type=int, default=1024, help="Number of tokens to use for continuous values (e.g. actions, observations).")
+    discrete_tokens = Arg[int]('--discrete_tokens', type=int, default=1024, help="Number of tokens to use for discrete actions.")
 
     # transformer architecture hyperparameters
     tokenizer_model_name = Arg[str]('--tokenizer_model_name', type=str, default='gpt2')
-    pretrained_lm = Arg[str]('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
+    pretrained_lm = Arg[str]('--pretrained_lm', type=str, default=None, help="Initialize with a pretrained language model, overriding --embed-dim, --layers, --heads, --activation-fn")
     flash = Arg[int]('--flash', default=False, action='store_true') # enable flash attention
     init_checkpoint = Arg[str]('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
 

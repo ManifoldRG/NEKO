@@ -34,7 +34,10 @@ class ParseArger(argparse.ArgumentParser, Generic[Namespace]):
         self.namespace = namespace
         if namespace is not None:
             for name, descriptor in namespace.descriptors:
-                self.add_argument(f"--{name.replace('_', '-')}", *descriptor.args, **descriptor.kwargs)
+                if len(descriptor.args) == 0:
+                    self.add_argument(f"--{name.replace('_', '-')}", *descriptor.args, **descriptor.kwargs)
+                else:
+                    self.add_argument(*descriptor.args, **descriptor.kwargs)
 
     def parse_args(self, args=None) -> Namespace:
         return cast(Namespace, super().parse_args(args=args, namespace=self.namespace))
