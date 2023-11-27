@@ -1,4 +1,4 @@
-import argparse
+from utils.argparsing import Arg, ParseArger, Namespace
 import random
 import os
 
@@ -132,104 +132,10 @@ def main(args):
     trainer.train()
 
 
-class Args(argparse.Namespace):
-    cpu: bool
-    mixed_precision: str
-
-    # Input & tokenization
-    sequence_length: int
-    patch_size: int
-    resid_mid_channels: int
-    num_groups: int
-    patch_position_vocab_size: int
-    disable_patch_pos_encoding: bool
-    disable_inner_pos_encoding: bool
-
-    mu: int
-    M: int
-
-    vocab_size: int
-    continuous_tokens: int
-    discrete_tokens: int
-
-    # transformer architecture hyperparameters
-    tokenizer_model_name: str
-    pretrained_lm: str
-    flash: bool
-    init_checkpoint: str
-
-    embed_dim: int
-    layers: int
-    heads: int
-    activation_fn: str
-    activation_fn: str
-
-    # PEFT hyperparameters
-    lora: bool
-    lora_r: int
-    lora_alpha: int
-    lora_dropout: float
-
-    # training hyperparameters
-    text_prop: float
-    gradient_accumulation_steps: int
-    batch_size: int
-    dropout: float
-
-    beta_1: float
-    beta_2: float
-    adam_eps: float
-    weight_decay: float
-
-    grad_norm_clip: float
-    disable_grad_clip: bool
-
-    warmup_steps: int
-    init_lr: float
-    learning_rate: float
-
-    min_factor: float
-    disable_cosine_decay: bool
-
-    training_steps: int
-    log_eval_freq: int
-
-    pad_seq: bool
-
-
-    # evaluation
-    eval_episodes: int
-    eval_mode: str
-    promptless_eval: bool
-    eval_text_num_examples: int
-    eval_text_log_examples: bool
-
-    # datasets / envs
-    control_datasets: str
-    text_datasets: str
-    text_datasets_paths: str
-
-    # params for sampling from datasets
-    prompt_ep_proportion: float
-    prompt_len_proportion: float
-    unique_prompt_episodes: bool
-    top_k: int
-
-    # logging
-    use_wandb: bool
-    wandb_project: str
-
-    # saving
-    save_model: bool
-    save_mode: str
-    save_dir: str
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-
+class TrainArgs(Namespace):
     # Accelerate args
-    parser.add_argument('--cpu', action='store_true', default=False)
-    parser.add_argument(
+    cpu = Arg[int]('--cpu', action='store_true', default=False)
+    Arg[str](
         "--mixed_precision",
         type=str,
         default=None,
@@ -240,95 +146,96 @@ if __name__ == '__main__':
     )
 
     # Input & tokenization
-    parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
-    parser.add_argument('--patch_size', type=int, default=16) # image patch size
-    parser.add_argument('--resid_mid_channels', type=int, default=128) # number of channels in residual MLP
-    parser.add_argument('--num_groups', type=int, default=32) # GroupNorm groups in ResNet
-    parser.add_argument('--patch_position_vocab_size', type=int, default=128)
-    parser.add_argument('--disable_patch_pos_encoding', action='store_true', default=False)
-    parser.add_argument('--disable_inner_pos_encoding', action='store_true', default=False)
+    sequence_length = Arg[int]('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
+    patch_size = Arg[int]('--patch_size', type=int, default=16) # image patch size
+    resid_mid_channels = Arg[int]('--resid_mid_channels', type=int, default=128) # number of channels in residual MLP
+    num_groups = Arg[int]('--num_groups', type=int, default=32) # GroupNorm groups in ResNet
+    patch_position_vocab_size = Arg[int]('--patch_position_vocab_size', type=int, default=128)
+    disable_patch_pos_encoding = Arg[int]('--disable_patch_pos_encoding', action='store_true', default=False)
+    disable_inner_pos_encoding = Arg[int]('--disable_inner_pos_encoding', action='store_true', default=False)
 
-    parser.add_argument('--mu','-mu', type=int, default=100) # mu-law encoding
-    parser.add_argument('--M', '-M', type=int, default=256)
+    mu = Arg[int]('--mu','-mu', type=int, default=100) # mu-law encoding
+    M = Arg[int]('--M', '-M', type=int, default=256)
 
-    #parser.add_argument('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
-    parser.add_argument('--continuous_tokens', type=int, default=1024) # number of tokens for continuous values (e.g. actions, observations)
-    parser.add_argument('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
+    #vocab_size = Arg[int]('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
+    continuous_tokens = Arg[int]('--continuous_tokens', type=int, default=1024) # number of tokens for continuous values (e.g. actions, observations)
+    discrete_tokens = Arg[int]('--discrete_tokens', type=int, default=1024) # number of discrete action tokens
 
     # transformer architecture hyperparameters
-    parser.add_argument('--tokenizer_model_name', type=str, default='gpt2')
-    parser.add_argument('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
-    parser.add_argument('--flash', default=False, action='store_true') # enable flash attention
-    parser.add_argument('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
+    tokenizer_model_name = Arg[str]('--tokenizer_model_name', type=str, default='gpt2')
+    pretrained_lm = Arg[str]('--pretrained_lm', type=str, default=None) # Init with pretrained LM override embed_dim, layers, heads, activation_fn
+    flash = Arg[int]('--flash', default=False, action='store_true') # enable flash attention
+    init_checkpoint = Arg[str]('--init_checkpoint', type=str, default=None) # Will not override architecture, only load weights from Gato checkpoint
 
-    parser.add_argument('--embed_dim', type=int, default=768)
-    parser.add_argument('--layers', type=int, default=8)
-    parser.add_argument('--heads', type=int, default=24)
-    parser.add_argument('--activation_fn', type=str, default='gelu')
-    #parser.add_argument('--activation_fn', type=str, default='geglu')
+    embed_dim = Arg[int]('--embed_dim', type=int, default=768)
+    layers = Arg[int]('--layers', type=int, default=8)
+    heads = Arg[int]('--heads', type=int, default=24)
+    activation_fn = Arg[str]('--activation_fn', type=str, default='gelu')
+    #activation_fn = Arg[str]('--activation_fn', type=str, default='geglu')
 
     # PEFT hyperparameters
-    parser.add_argument('--lora', action='store_true', default=False)
-    parser.add_argument('--lora_r', type=int, default=8)
-    parser.add_argument('--lora_alpha', type=int, default=32)
-    parser.add_argument('--lora_dropout', type=float, default=0.1)
+    lora = Arg[int]('--lora', action='store_true', default=False)
+    lora_r = Arg[int]('--lora_r', type=int, default=8)
+    lora_alpha = Arg[int]('--lora_alpha', type=int, default=32)
+    lora_dropout = Arg[float]('--lora_dropout', type=float, default=0.1)
 
     # training hyperparameters
-    parser.add_argument('--text_prop', type=float, default=0.5) # proportion of text data in batch
-    parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
-    parser.add_argument('--batch_size', type=int, default=512)
-    parser.add_argument('--dropout', type=float, default=0.1)
+    text_prop = Arg[float]('--text_prop', type=float, default=0.5) # proportion of text data in batch
+    gradient_accumulation_steps = Arg[int]('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
+    batch_size = Arg[int]('--batch_size', type=int, default=512)
+    dropout = Arg[float]('--dropout', type=float, default=0.1)
 
-    parser.add_argument('--beta_1', type=float, default=0.9)
-    parser.add_argument('--beta_2', type=float, default=0.95)
-    parser.add_argument('--adam_eps', type=float, default=1e-8)
-    parser.add_argument('--weight_decay', type=float, default=0.1)
+    beta_1 = Arg[float]('--beta_1', type=float, default=0.9)
+    beta_2 = Arg[float]('--beta_2', type=float, default=0.95)
+    adam_eps = Arg[float]('--adam_eps', type=float, default=1e-8)
+    weight_decay = Arg[float]('--weight_decay', type=float, default=0.1)
 
-    parser.add_argument('--grad_norm_clip', type=float, default=1.0)
-    parser.add_argument('--disable_grad_clip', action='store_true', default=False)
+    grad_norm_clip = Arg[float]('--grad_norm_clip', type=float, default=1.0)
+    disable_grad_clip = Arg[int]('--disable_grad_clip', action='store_true', default=False)
 
-    parser.add_argument('--warmup_steps', type=int, default=15000)
-    parser.add_argument('--init_lr', type=float, default=1e-7) # starting LR for warmup
-    parser.add_argument('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR after warmup
+    warmup_steps = Arg[int]('--warmup_steps', type=int, default=15000)
+    init_lr = Arg[float]('--init_lr', type=float, default=1e-7) # starting LR for warmup
+    learning_rate = Arg[float]('--learning_rate', '-lr',type=float, default=1e-4) # the maximum LR after warmup
 
-    parser.add_argument('--min_factor', type=float, default=10.0) # the minimum LR factor, e.g. w/ 10, base 1e-4 -> 1e-5 for Cosine Decay
-    parser.add_argument('--disable_cosine_decay', action='store_true', default=False) # disable cosine decay
+    min_factor = Arg[float]('--min_factor', type=float, default=10.0) # the minimum LR factor, e.g. w/ 10, base 1e-4 -> 1e-5 for Cosine Decay
+    disable_cosine_decay = Arg[int]('--disable_cosine_decay', action='store_true', default=False) # disable cosine decay
 
-    parser.add_argument('--training_steps', type=int, default=1_000_000)
-    parser.add_argument('--log_eval_freq', type=int, default=100_000)
+    training_steps = Arg[int]('--training_steps', type=int, default=1_000_000)
+    log_eval_freq = Arg[int]('--log_eval_freq', type=int, default=100_000)
 
-    parser.add_argument('--pad_seq', action='store_true', default=False) # pad sequences to max length
+    pad_seq = Arg[int]('--pad_seq', action='store_true', default=False) # pad sequences to max length
 
 
     # evaluation
-    parser.add_argument('--eval_episodes', type=int, default=10)
-    parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
-    parser.add_argument('--promptless_eval', action='store_true', default=False)
-    parser.add_argument('--eval_text_num_examples', type=int, default=100)
-    parser.add_argument('--eval_text_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
+    eval_episodes = Arg[int]('--eval_episodes', type=int, default=10)
+    eval_mode = Arg[str]('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
+    promptless_eval = Arg[int]('--promptless_eval', action='store_true', default=False)
+    eval_text_num_examples = Arg[int]('--eval_text_num_examples', type=int, default=100)
+    eval_text_log_examples = Arg[int]('--eval_text_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
 
     # datasets / envs
-    parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
-    parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
-    parser.add_argument('--text_datasets_paths', type=str, nargs='+', default=[]) # ['wikitext']
+    control_datasets = Arg[str]('--control_datasets', type=str, nargs='+', default=[])
+    text_datasets = Arg[str]('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
+    text_datasets_paths = Arg[str]('--text_datasets_paths', type=str, nargs='+', default=[]) # ['wikitext']
 
     # params for sampling from datasets
-    parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
-    parser.add_argument('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
-    parser.add_argument('--unique_prompt_episodes', default=False, action='store_true')
-    parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
+    prompt_ep_proportion = Arg[float]('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
+    prompt_len_proportion = Arg[float]('--prompt_len_proportion', type=float, default=0.5) # proportion of context consumed by prompt
+    unique_prompt_episodes = Arg[int]('--unique_prompt_episodes', default=False, action='store_true')
+    top_k = Arg[int]('--top_k', type=int, default=None) # sample prompts only from top k episodes
 
     # logging
-    parser.add_argument('--use_wandb', '-w', action='store_true', default=False)
-    parser.add_argument('--wandb_project', type=str, default='gato-control')
+    use_wandb = Arg[int]('--use_wandb', '-w', action='store_true', default=False)
+    wandb_project = Arg[str]('--wandb_project', type=str, default='gato-control')
 
     # saving
-    parser.add_argument('--save_model', action='store_true', default=False)
-    parser.add_argument('--save_mode', type=str, default='last', choices=['checkpoint', 'last']) # Checkpoit saves model every after each log_eval_freq steps
-    parser.add_argument('--save_dir', type=str, default='models')
+    save_model = Arg[int]('--save_model', action='store_true', default=False)
+    save_mode = Arg[str]('--save_mode', type=str, default='last', choices=['checkpoint', 'last']) # Checkpoit saves model every after each log_eval_freq steps
+    save_dir = Arg[str]('--save_dir', type=str, default='models')
 
-    ns = Args()
-    args = parser.parse_args(namespace=ns)
+if __name__ == '__main__':
+    parser = ParseArger(namespace=TrainArgs())
+    args = parser.parse_args()
 
     # Checks
     assert args.training_steps % args.log_eval_freq == 0, 'training_steps must be divisible by eval_freq'
