@@ -1,5 +1,6 @@
 import random
 import os
+import sys
 
 import wandb
 import torch
@@ -10,7 +11,9 @@ from accelerate import DistributedDataParallelKwargs
 
 import transformers
 
+from gato.utils.typed_argparser import TypedArgumentParser
 from gato.cli import parse_args_training
+from gato.training.arguments import TrainingArgs
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.training.trainer import Trainer
@@ -131,5 +134,19 @@ def main(args):
     trainer.train()
 
 if __name__ == '__main__':
+
+
+    parser = TypedArgumentParser(TrainingArgs)
+    (args,) = parser.parse_args_into_dataclasses(sys.argv)
+
+    # Checks
+    assert args.training_steps % args.log_eval_freq == 0, 'training_steps must be divisible by eval_freq'
+    assert args.training_steps > args.warmup_steps, 'training_steps must be greater than warmup_steps'
+    assert args.learning_rate > args.init_lr, 'learning_rate must be greater than init_lr'
+
+    # make sure proportions are between 0 and 1
+    assert 0 <= args.prompt_ep_proportion <= 1, 'prompt_ep_proportion must be between 0 and 1'
+    assert 0 <= args.prompt_len_proportion <= 1, 'prompt_len_proportion must be between 0 and 1'
+    return args
     args = parse_args_training()
     main(args)
