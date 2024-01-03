@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 import torch
 import torch.nn as nn
 import numpy as np
@@ -42,7 +42,7 @@ class GatoPolicy(nn.Module):
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
 
-        pretrained_lm: str = None, # Optional, name of pretrained language model to use
+        pretrained_lm: Optional[str] = None, # Optional, name of pretrained language model to use
         flash: bool = False, # TODO verify correctness
         tokenizer_model_name: str = 'gpt2',
         pad_seq: bool = False

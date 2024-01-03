@@ -1,13 +1,13 @@
 python -m pdb train.py \
     --embed_dim=768 \
-    --layers=6 \
-    --heads=24 \
-    --training_steps=1000 \
-    --log_eval_freq=10 \
-    --warmup_steps=20 \
-    --batch_size=16 \
-    --sequence_length=1024 \
-    --eval_episodes=10 \
+    --layers=4 \
+    --heads=12 \
+    --training_steps=12 \
+    --log_eval_freq=4 \
+    --warmup_steps=1 \
+    --batch_size=4 \
+    --sequence_length=512 \
+    --eval_episodes=1 \
     --activation_fn=gelu \
     --save_model \
     --save_mode=checkpoint \

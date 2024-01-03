@@ -118,6 +118,7 @@ class TrainingArgs:
         save_dir: str = field(default='models')
     """
     cpu: bool = field(default=False, metadata={"help": 'Force script to execute on CPU. Passed to Accelerator.'})
+    device: Literal["cpu", "xpu", "cuda", "mps", "npu"] = field(default="cpu", metadata={"help": "PyTorch device to run on."})
     mixed_precision: Literal["no", "fp16", "bf16", "fp8"] = field(
         default="no",
         metadata={"help": "Whether to use mixed precision. Choose"
@@ -135,7 +136,7 @@ class TrainingArgs:
     disable_inner_pos_encoding: int = field(default=False)
 
     mu: int = field(default=100) # mu-law encoding
-    M: Optional[int]= field(default=256)
+    M: int = field(default=256)
 
     #vocab_size: Optional[int]('--vocab_size', type=int, default=32000) # number of tokens from SentencePiece
     continuous_tokens: int = field(default=1024, metadata={"help": "Number of tokens to use for continuous values (e.g. actions, observations)."})
@@ -144,7 +145,7 @@ class TrainingArgs:
     # transformer architecture hyperparameters
     tokenizer_model_name: str = field(default='gpt2')
     pretrained_lm: Optional[str] = field(default=None, metadata={"help": "Initialize with a pretrained language model, overriding --embed-dim, --layers, --heads, --activation-fn"})
-    flash: int = field(default=False) # enable flash attention
+    flash: bool = field(default=False) # enable flash attention
     init_checkpoint: Optional[str] = field(default=None) # Will not override architecture, only load weights from Gato checkpoint
 
     embed_dim: int = field(default=768)
