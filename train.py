@@ -12,7 +12,6 @@ from accelerate import DistributedDataParallelKwargs
 import transformers
 
 from gato.utils.typed_argparser import TypedArgumentParser
-from gato.cli import parse_args_training
 from gato.training.arguments import TrainingArgs
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
