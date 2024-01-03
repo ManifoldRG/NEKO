@@ -1,7 +1,6 @@
+from typing import Optional
 import torch
 import torch.nn as nn
-import numpy as np
-from einops import rearrange
 
 import gymnasium as gym
 import transformers
@@ -12,8 +11,6 @@ from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 from gato.tasks.control_task import ControlTask
-from torch.nn import functional as F
-from copy import deepcopy
 
 class GatoPolicy(nn.Module):
     def __init__(
@@ -41,7 +38,7 @@ class GatoPolicy(nn.Module):
         use_pos_encoding: bool = True,
         use_patch_pos_encoding: bool = True,
 
-        pretrained_lm: str = None, # Optional, name of pretrained language model to use
+        pretrained_lm: Optional[str] = None, # Optional, name of pretrained language model to use
         flash: bool = False, # TODO verify correctness
         tokenizer_model_name: str = 'gpt2',
         pad_seq: bool = False
