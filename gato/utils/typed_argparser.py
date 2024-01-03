@@ -15,6 +15,7 @@
 # Pulled from https://github.com/huggingface/transformers/blob/main/src/transformers/hf_argparser.py#L1
 # For usage examples, see: https://github.com/huggingface/transformers/blob/main/tests/utils/test_hf_argparser.py#L163
 
+from collections.abc import Iterable
 import dataclasses
 import json
 import sys
@@ -29,8 +30,8 @@ from typing import Any, Callable, Dict, Iterable, List, Literal, NewType, Option
 import yaml
 
 
-DataClass = NewType("DataClass", Any)
-DataClassType = NewType("DataClassType", Any)
+DataClass = TypeVar("DataClass")
+DataClassType = TypeVar("DataClassType")
 
 
 # From https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
@@ -109,7 +110,7 @@ def TypedArg(
     return dataclasses.field(metadata=metadata, default=default, default_factory=default_factory, **kwargs)
 
 
-class TypedArgumentParser(ArgumentParser):
+class TypedArgumentParser(ArgumentParser, Generic[DataClass, DataClassType]):
     """
     This subclass of `argparse.ArgumentParser` uses type hints on dataclasses to generate arguments.
 
@@ -132,7 +133,7 @@ class TypedArgumentParser(ArgumentParser):
         if "formatter_class" not in kwargs:
             kwargs["formatter_class"] = ArgumentDefaultsHelpFormatter
         super().__init__(**kwargs)
-        if dataclasses.is_dataclass(dataclass_types):
+        if not isinstance(dataclass_types, Iterable):
             dataclass_types = [dataclass_types]
         self.dataclass_types = list(dataclass_types)
         for dtype in self.dataclass_types:
@@ -272,7 +273,7 @@ class TypedArgumentParser(ArgumentParser):
         look_for_args_file=True,
         args_filename=None,
         args_file_flag=None,
-    ) -> Tuple[DataClass, ...]:
+    ) -> Tuple[DataClassType, ...]:
         """
         Parse command-line args into instances of the specified dataclass types.
 

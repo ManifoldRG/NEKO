@@ -1,3 +1,4 @@
+from argparse import ArgumentTypeError
 import os
 import json
 from copy import deepcopy
@@ -13,7 +14,6 @@ class DotDict(dict):
 
     def __deepcopy__(self, memo=None):
         return DotDict(deepcopy(dict(self), memo=memo))
-
 
 
 def save_model(model, save_dir, save_name, config_args):
