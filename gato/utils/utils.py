@@ -1,4 +1,3 @@
-from argparse import ArgumentTypeError
 import os
 import json
 from copy import deepcopy

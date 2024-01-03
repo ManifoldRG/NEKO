@@ -146,6 +146,3 @@ if __name__ == '__main__':
     assert 0 <= args.prompt_ep_proportion <= 1, 'prompt_ep_proportion must be between 0 and 1'
     assert 0 <= args.prompt_len_proportion <= 1, 'prompt_len_proportion must be between 0 and 1'
     main(args)
-
-foo = TrainingArgs()
-foo.adam_eps
