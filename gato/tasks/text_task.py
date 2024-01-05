@@ -1,18 +1,20 @@
+from __future__ import annotations
 # supports dataset in huggingface datasets library for now
 from datasets import load_dataset, concatenate_datasets
-from gato.tasks.task import Task, TaskTypeEnum
+from gato.tasks.task import Task
 import numpy as np
-import math
-from torch.nn import functional as F
 from torch import nn
-from typing import List,Dict
-from transformers import AutoTokenizer, GPT2Tokenizer
+from typing import TYPE_CHECKING, List,Dict
+from transformers import AutoTokenizer
 import torch
 import copy
+
+if TYPE_CHECKING:
+    from gato.policy.gato_policy import GatoPolicy
+
 class TextTask(Task): 
-       
-    def __init__(self, task_type, dataset_names:List[str], dataset_paths:List[str], context_length:int, tokenizer_model:str):
-        super().__init__(task_type)
+    def __init__(self, dataset_names:List[str], dataset_paths:List[str], context_length:int, tokenizer_model:str):
+        super().__init__()
         self.context_length = context_length
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         text_datasets_list = []
@@ -57,7 +59,7 @@ class TextTask(Task):
         
         return batch_dicts
         
-    def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):
+    def evaluate(self, model: GatoPolicy, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):
         tokenizer = model.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0

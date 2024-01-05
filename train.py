@@ -9,7 +9,6 @@ from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
 from accelerate import DistributedDataParallelKwargs
 
-import transformers
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
@@ -18,7 +17,6 @@ from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
-from gato.tasks.task import TaskTypeEnum
 
 
 def main(args):
@@ -35,7 +33,6 @@ def main(args):
     envs, control_datasets = load_envs(args.control_datasets) # Load Minari datasets and corresponding Gym environments
     for env, dataset in zip(envs, control_datasets):
         task = ControlTask(
-            TaskTypeEnum.CONTROL,
             env.unwrapped.spec.id,
             env,
             dataset,
@@ -49,7 +46,7 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT, args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name))
+        tasks.append(TextTask(args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name))
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
 

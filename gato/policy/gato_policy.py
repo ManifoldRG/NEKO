@@ -1,4 +1,5 @@
-from typing import Optional
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
 import torch
 import torch.nn as nn
 
@@ -10,7 +11,9 @@ from transformers import AutoTokenizer
 from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
-from gato.tasks.control_task import ControlTask
+
+if TYPE_CHECKING:
+    from gato.tasks.control_task import ControlTask
 
 class GatoPolicy(nn.Module):
     def __init__(
@@ -147,7 +150,7 @@ class GatoPolicy(nn.Module):
 
 
     # predicts next token (for each input token)
-    def forward(self, inputs: list = None, compute_loss=False, **kwargs):
+    def forward(self, inputs: Optional[list]=None, compute_loss=False, **kwargs):
         # tokenize inputs
         if inputs is not None:
             token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
