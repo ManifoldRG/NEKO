@@ -29,7 +29,7 @@ class ControlTask(Task):
     def __init__(
             self,
             env_name: str,
-            env: gym.Env, 
+            env: gym.Env,
             dataset: minari.MinariDataset, 
             context_len: int,
             args,
