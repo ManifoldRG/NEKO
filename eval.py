@@ -3,7 +3,6 @@ import os
 import json
 import time
 
-import numpy as np
 import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
@@ -14,8 +13,6 @@ from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.tasks.control_task import ControlTask
-from gato.tasks.text_task import TextTask
-from gato.tasks.task import TaskTypeEnum
 
 
 def main(args):
@@ -49,8 +46,8 @@ def main(args):
     env_names = []
     for env, dataset in zip(envs, datasets):
         task = ControlTask(
-            env.unwrapped.spec.id, 
-            env, 
+            env.unwrapped.spec.id,
+            env,
             dataset,
             args = eval_args,
             context_len=eval_args.sequence_length,
