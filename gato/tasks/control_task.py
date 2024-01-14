@@ -23,7 +23,6 @@ def tokens_per_space(space):
 class ControlTask(Task):
     def __init__(
             self,
-            task_type: TaskTypeEnum,
             env_name: str, 
             env: gym.Env, 
             dataset: minari.MinariDataset, 
@@ -33,7 +32,7 @@ class ControlTask(Task):
             share_prompt_episodes=True,
             top_k_prompting=None
         ):
-        super().__init__(task_type)
+        super().__init__(TaskTypeEnum.CONTROL.value)
         self.name = env_name
         self.is_atari = 'ALE' in env_name
         self.env = env

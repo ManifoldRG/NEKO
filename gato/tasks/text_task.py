@@ -11,8 +11,8 @@ import torch
 import copy
 class TextTask(Task): 
        
-    def __init__(self, task_type, dataset_names:List[str], dataset_paths:List[str], context_length:int, tokenizer_model:str):
-        super().__init__(task_type)
+    def __init__(self, dataset_names:List[str], dataset_paths:List[str], context_length:int, tokenizer_model:str):
+        super().__init__(TaskTypeEnum.TEXT.value)
         self.context_length = context_length
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         text_datasets_list = []
