@@ -90,8 +90,7 @@ class VqaTask(Task):
         return dataset
     
     def sample_batch(self, batch_size):
-        random_indices = np.random.randint(0, len(self.dataset['train']), size=batch_size)
-        random_indices = [i.item() for i in random_indices]
+        random_indices = [random.randint(0, len(self.dataset['train'])-1) for _ in range(batch_size)]
         selected_examples = [self.dataset['train'][idx] for idx in random_indices]
 
         batch_dicts = []
@@ -117,11 +116,15 @@ class VqaTask(Task):
 
         if log_examples_to_output:
             print(f'--- examples ---')
+
+        random_indices = [random.randint(0, len(self.dataset['test'])-1) for _ in range(num_examples_to_test)]
+        selected_examples = [self.dataset['test'][idx] for idx in random_indices]
+
         for idx in range(num_examples_to_test):
-            image = self.dataset['test'][idx]['image']
-            question = self.dataset['test'][idx]['question']
-            answer_idx = random.randint(0, len(self.dataset['test'][idx]['answers'])-1) # randomly choose an answer out of the set of answers
-            target_answer = self.dataset['test'][idx]['answers'][answer_idx]['answer'] 
+            image = selected_examples[idx]['image']
+            question = selected_examples[idx]['question']
+            answer_idx = random.randint(0, len(selected_examples[idx]['answers'])-1) # randomly choose an answer out of the set of answers
+            target_answer = selected_examples[idx]['answers'][answer_idx]['answer'] 
             target_tokens = tokenizer.encode(target_answer)
 
             # Generate prediction

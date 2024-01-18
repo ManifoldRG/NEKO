@@ -468,7 +468,7 @@ class GatoPolicy(nn.Module):
 
 
         return concat_probs, concat_pred_tokens
-
+    
     # This funciton can be used to generate a response from an image, such as generating the caption or 
     # an answer to a question about an image, it is adapted from the original predict_caption() function
     def predict_response(self, image, prompt_tokens = [], max_length=128, deterministic=True):
@@ -520,24 +520,17 @@ class GatoPolicy(nn.Module):
             else:
                 probs = F.softmax(next_token_logits)
                 next_token = torch.multinomial(probs, num_samples=1).item()
-
-            # Stop generating text tokens when the eos_token_id is reached
-            if next_token == self.text_tokenizer.eos_token_id:
-                break
             
             # Keep appending the next_token to the generated response tokens, continue the loop by feeding the 
             # generated tokens along with the image embeddings into the transformer to generate the next next_token
             response_tokens.append(next_token)
 
-        if len(response_tokens) < max_length: #then pad with eos to max_length
-            response_tokens = response_tokens.append([self.text_tokenizer.eos_token_id]*(max_length - len(response_tokens)))
         pred_response = self.text_tokenizer.decode(response_tokens)
 
         # The logits for all of the predicted "next_token"'s as tokens in the predicted response
-        # squeeze shape (1, idx+1, self.text_tokens) to (idx+1, self.text_tokens), idx+1 is the length of predicted response
-        # Note: need to use squeeze(0) since we only want to squeeze on the first dim. Do not use squeeze() since it will squeeze all dims
-        # with a dim value of 1. In case idx+1==1, i.e., the length of predicted response is 1, we do not want to squeeze on that dim
-        pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches + len(prompt_tokens) + idx, :self.text_tokens].squeeze(0)  
+        # squeeze shape (1, max_length, self.text_tokens) to (max_length, self.text_tokens), 
+        pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches + len(prompt_tokens) + max_length - 1, :self.text_tokens].squeeze(0)  
+
         return pred_logits, pred_response 
     
     def predict_caption(self, image, max_length=128, deterministic=True):

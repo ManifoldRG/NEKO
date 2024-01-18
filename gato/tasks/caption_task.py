@@ -103,8 +103,7 @@ class CaptionTask(Task):
         return dataset       
     
     def sample_batch(self, batch_size):
-        random_indices = np.random.randint(0, len(self.dataset['train']), size=batch_size)
-        random_indices = [i.item() for i in random_indices]
+        random_indices = [random.randint(0, len(self.dataset['train'])-1) for _ in range(batch_size)]
         selected_examples = [self.dataset['train'][idx] for idx in random_indices]
         
         batch_dicts = []
@@ -129,9 +128,13 @@ class CaptionTask(Task):
 
         if log_examples_to_output:
             print(f'--- examples ---')
+
+        random_indices = [random.randint(0, len(self.dataset['test'])-1) for _ in range(num_examples_to_test)]
+        selected_examples = [self.dataset['test'][idx] for idx in random_indices]
+
         for idx in range(num_examples_to_test):
-            image = self.dataset['test'][idx]['image']
-            target_caption = self.dataset['test'][idx]['text']
+            image = selected_examples[idx]['image']
+            target_caption = selected_examples[idx]['text']
             target_tokens = tokenizer.encode(target_caption)
 
             # Generate prediction
