@@ -479,22 +479,24 @@ class GatoPolicy(nn.Module):
             if the predicted response is an answer to a question about the image, then this list are the tokens of the question
         max_length is the max length of response to be generated, will cut off at max_length
         """
+        action_str = 'text'
+        start_token = self.token_starts[action_str]
+        end_token = self.token_ends[action_str]
+        
         image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate response
         n_images = image_embeddings.shape[0]
         n_patches = image_embeddings.shape[1] 
         assert n_images == 1, "number of images should always be 1 for predicting response"
 
+        pred_logits = None
         response_tokens = []
 
         for idx in range(max_length): # idx can be viewed as the index of the 'next_token' within the list of such generated response tokens
 
             # Include 'image_embeddings' instead of 'images' below to avoid re-calculating the same image embedding in every loop
-            # Note: the following 'text' is actually text token IDs instead of actual text. 
-            # We were using actual text before (and at that time tokenize_input_dicts(...) function also took actual text), and found an error 
-            # due to an edge case. The edge case is that the generated tokens could contain a sequence of .... (periods) or ,,,, (commas), 
-            # and if actual text is used in the following 'text', the tokenizer will treat the sequence as one token (which is not the desired behavior) 
-            # instead of a group of separate tokens (the desired behavior), and raise "index out of bound" exception on "n_patches - 1 + len(prompt_tokens)" 
-            # below where next_token_logits is calculated
+            # Note: the following 'text' is actually text token IDs instead of actual text. Reverting back to actual text will result in an edge case
+            # where the generated tokens could contain a sequence of .... (periods) or ,,,, (commas), the tokenizer will treat the sequence as one token
+            # instead of a group of separate tokens, and raise "index out of bound" exception on "n_patches - 1 + len(prompt_tokens)" 
             batch_dict = {
                 'image_embeddings': image_embeddings,
                 'text': torch.tensor(prompt_tokens + response_tokens)
@@ -510,26 +512,31 @@ class GatoPolicy(nn.Module):
             # the transformer, and then auto-regressively predict the next tokens, the context info of the image is conveyed through the 
             # self-attention mechanism. The first text token of the generated response is the "next token" predicted by the last image token 
             # in the sequence, and the second text token is predicted by the first text token, so on and so forth. 
-            # In the following line of code:
-            #   n_patches - 1 + len(prompt_tokens) + idx is the index of the token in the sequence that will predict the next text token of the generated response
-            #   squeeze the logits from shape (1, 1, vocab_size) to shape (vocab_size) and restrict the choice to the range 
-            #       within text tokens. The complete vocab contains non-text toksns also, we need to to exclude them from the choice
-            next_token_logits = logits[:, n_patches -1 + len(prompt_tokens) + idx, :].squeeze()[:self.text_tokens]     # shape (self.text_tokens)
+
+            # In the following line of code, "n_patches - 1 + len(prompt_tokens) + idx" is the index of the token in the sequence that will 
+            # predict the next text token of the generated response
+            next_token_logits = logits[0, n_patches -1 + len(prompt_tokens) + idx, start_token:(end_token+1)]
             if deterministic:
                 next_token = torch.argmax(next_token_logits).item()
             else:
                 probs = F.softmax(next_token_logits)
                 next_token = torch.multinomial(probs, num_samples=1).item()
             
+            if pred_logits is None:
+                pred_logits = next_token_logits.unsqueeze(0)
+            else:
+                pred_logits = torch.cat([pred_logits, next_token_logits.unsqueeze(0)], dim=0)
+
             # Keep appending the next_token to the generated response tokens, continue the loop by feeding the 
             # generated tokens along with the image embeddings into the transformer to generate the next next_token
             response_tokens.append(next_token)
+
 
         pred_response = self.text_tokenizer.decode(response_tokens)
 
         # The logits for all of the predicted "next_token"'s as tokens in the predicted response
         # squeeze shape (1, max_length, self.text_tokens) to (max_length, self.text_tokens), 
-        pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches - 1 + len(prompt_tokens) + max_length, :self.text_tokens].squeeze(0)  
+        #pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches - 1 + len(prompt_tokens) + max_length, :self.text_tokens].squeeze(0)  
 
         return pred_logits, pred_response 
     
