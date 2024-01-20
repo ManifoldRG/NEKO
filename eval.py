@@ -4,7 +4,6 @@ import os
 import json
 import time
 
-import numpy as np
 import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
@@ -15,9 +14,7 @@ from gato.training.arguments import TrainingArgs
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
-from gato.training.trainer import Trainer
 from gato.tasks.control_task import ControlTask
-from gato.tasks.task import TaskTypeEnum
 
 
 def main(args):
@@ -49,9 +46,8 @@ def main(args):
     env_names = []
     for env, dataset in zip(envs, datasets):
         task = ControlTask(
-            TaskTypeEnum.CONTROL.value,
-            env.unwrapped.spec.id, 
-            env, 
+            env.unwrapped.spec.id,
+            env,
             dataset,
             args = eval_args,
             context_len=eval_args.sequence_length,
@@ -62,6 +58,10 @@ def main(args):
         env_names.append(env.unwrapped.spec.id)
         tasks.append(task)
     print('Evaluating on envs:', env_names)
+
+    if len(args.text_datasets) > 0:
+        # add text datasets
+        tasks.append(TextTask(args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
 
     model = GatoPolicy(
         device=eval_args.device,
@@ -101,12 +101,17 @@ def main(args):
     model.eval()
     eval_start = time.time()
     
-    # loop over eval for each env
+    # loop over eval for each task
     with torch.no_grad():
         for task in tasks:
-            eval_logs = task.evaluate(model, n_iterations=eval_args.eval_episodes, deterministic=eval_args.eval_mode == 'deterministic', promptless_eval=eval_args.promptless_eval)
-            for k, v in eval_logs.items():
-                logs[f'evaluation/{task.name}/{k}'] = v
+            if task.task_type == TaskTypeEnum.CONTROL.value:
+                eval_logs = task.evaluate(model, n_iterations=eval_args.eval_episodes, deterministic=eval_args.eval_mode == 'deterministic', promptless_eval=eval_args.promptless_eval)
+                for k, v in eval_logs.items():
+                    logs[f'evaluation/{task.name}/{k}'] = v
+            elif task.task_type == TaskTypeEnum.TEXT.value:
+                eval_logs = task.evaluate(model, eval_args.eval_text_num_examples, deterministic=eval_args.eval_mode == 'deterministic', log_examples_to_output=eval_args.eval_text_log_examples)
+                for k, v in eval_logs.items():
+                    logs[f'evaluation/text/{k}'] = v
 
     logs['time/evaluation'] = time.time() - eval_start
 
@@ -124,14 +129,24 @@ if __name__ == '__main__':
     parser.add_argument('--cpu', default=False, action='store_true')
 
     # evaluation
-    parser.add_argument('--eval_episodes', type=int, default=None)
     parser.add_argument('--eval_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
+    
+    # evaluation - control
+    parser.add_argument('--eval_episodes', type=int, default=None)
     parser.add_argument('--promptless_eval', action='store_true', default=None)
     parser.add_argument('--top_k', type=int, default=None) # sample prompts only from top k episodes
     parser.add_argument('--render', action='store_true', default=None)
+    
+    # evaluation - text
+    parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
+    parser.add_argument('--tokenizer_model_name', type=str, default='gpt2')
+    parser.add_argument('--eval_text_num_examples', type=int, default=100)
+    parser.add_argument('--eval_text_log_examples', action='store_true', default=False)
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=None)
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
+    parser.add_argument('--text_datasets_paths', type=str, nargs='+', default=[]) # ['wikitext']
 
     args = parser.parse_args()
     args = DotDict(vars(args))
