@@ -1,6 +1,5 @@
 import random
 import os
-import sys
 
 import wandb
 import torch
@@ -8,8 +7,6 @@ import torch
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
 from accelerate import DistributedDataParallelKwargs
-
-import transformers
 
 from gato.utils.typed_argparser import TypedArgumentParser
 from gato.training.arguments import TrainingArgs
