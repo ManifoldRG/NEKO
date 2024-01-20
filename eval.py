@@ -15,6 +15,7 @@ from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.tasks.control_task import ControlTask
+from gato.tasks.text_task import TextTask
 
 
 def main(args):
@@ -104,11 +105,11 @@ def main(args):
     # loop over eval for each task
     with torch.no_grad():
         for task in tasks:
-            if task.task_type == TaskTypeEnum.CONTROL.value:
+            if isinstance(task, ControlTask):
                 eval_logs = task.evaluate(model, n_iterations=eval_args.eval_episodes, deterministic=eval_args.eval_mode == 'deterministic', promptless_eval=eval_args.promptless_eval)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/{task.name}/{k}'] = v
-            elif task.task_type == TaskTypeEnum.TEXT.value:
+            elif isinstance(task, TextTask):
                 eval_logs = task.evaluate(model, eval_args.eval_text_num_examples, deterministic=eval_args.eval_mode == 'deterministic', log_examples_to_output=eval_args.eval_text_log_examples)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/text/{k}'] = v
