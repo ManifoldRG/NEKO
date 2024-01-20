@@ -529,7 +529,7 @@ class GatoPolicy(nn.Module):
 
         # The logits for all of the predicted "next_token"'s as tokens in the predicted response
         # squeeze shape (1, max_length, self.text_tokens) to (max_length, self.text_tokens), 
-        pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches + len(prompt_tokens) + max_length - 1, :self.text_tokens].squeeze(0)  
+        pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches - 1 + len(prompt_tokens) + max_length, :self.text_tokens].squeeze(0)  
 
         return pred_logits, pred_response 
     
