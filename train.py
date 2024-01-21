@@ -1,6 +1,7 @@
 import argparse
 import random
 import os
+from datetime import datetime
 
 import wandb
 import torch
@@ -25,8 +26,8 @@ def main(args):
     device = accelerator.device
     args.device = accelerator.device
 
-    exp_id = random.randint(int(1e5), int(1e6) - 1)
-    exp_name = f'neko-gato-{exp_id}'
+    exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
+    exp_name = f'neko-gato_{exp_date}'
 
     tasks = []
     # add control datasets and env
