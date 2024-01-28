@@ -28,7 +28,7 @@ class VqaTask(Task):
         ***_img_file_name_len is a list, each item of the list holds the length of image file name for each sub directory
         ***_questions_file is a .json file name for for the file under each sub directory containining questions and images IDs
         ***_annotations_file is a .json file name for the file under each sub directory containing images IDs, quesitons and answers
-        For the current implementaiton, it is required that these files are named "questions.json" and "annnotations.json" under each sub diredctory
+        For the current implementaiton, it is required that these files are named "questions.json" and "annotations.json" under each sub diredctory
         Each sub directory should also contain the image files associated with the corresponding question and annotation files
         """
         super().__init__(task_type)
@@ -58,13 +58,13 @@ class VqaTask(Task):
                     # This is a list, each item contains an image ID, a question ID, and its corresponding answers (multiple answers to one question)
                     annotations = json.load(json_file)['annotations'] 
             except:
-                print(f"{data_directory} does not have a questions json file, or it is not named as annotations.json")
+                print(f"{data_directory} does not have a annotations json file, or it is not named as annotations.json")
 
             try:
                 with open(data_directory + questions_file, 'r') as json_file:
                     questions = json.load(json_file)['questions'] # This is a list of question IDs and the corresponding questions
             except:
-                print(f"{data_directory} does not have an annotations json file, or it is not named as questions.json")
+                print(f"{data_directory} does not have an questions json file, or it is not named as questions.json")
 
             assert len(annotations) == len(questions), "Number of annotations must be equal to number of questions" 
         
