@@ -200,6 +200,10 @@ class GatoPolicy(nn.Module):
                 continuous_obs: T x C or None # continuous vector observations
                 discrete_obs: T x D or None   # discrete observations
 
+                # Add this for the case of evaluating image caption task when the same image is used multiple times, so the image_embedding
+                # is passed in as a parameter to avoid re-calculating the embedding each time the image is used again
+                image_embeddings: T x num_patches_per_image x embed_dim 
+
                 # actions
                 continuous_actions: T x A or None
                 discrete_actions: T x B or None
@@ -272,8 +276,12 @@ class GatoPolicy(nn.Module):
                 # batch_embeddings.append(text_embeddings)
                 # batch_targets.append(torch.ones_like(text_tokens))
 
-            if 'images' in batch and batch['images'] is not None:
-                image_embeddings = self.image_embedding(batch['images']) # n_timesteps x n_patches x embed_dim
+            if 'images' in batch and batch['images'] is not None or 'image_embeddings' in batch and batch['image_embeddings'] is not None:
+                # Only one of the two should hold, 'image_embeddings' is used during evaluation of caption/vqa task to avoid re-calculating embedding for the same image every time
+                if 'images' in batch and batch['images'] is not None:
+                    image_embeddings = self.image_embedding(batch['images'].to(self.device)) # n_timesteps x n_patches x embed_dim
+                if 'image_embeddings' in batch and batch['image_embeddings'] is not None:
+                    image_embeddings = batch['image_embeddings']
                 n_images = image_embeddings.shape[0]
                 n_patches = image_embeddings.shape[1]
                 #image_tokens = torch.ones(n_images, n_patches) * -1
@@ -329,7 +337,6 @@ class GatoPolicy(nn.Module):
                     assert n_timesteps == discrete_action_tokens.shape[0], "number of timesteps must be the same for all modalities"
 
 
-
             separator_embeddings = torch.ones(n_timesteps, 1, self.embed_dim, device=self.device) * self.separator_token
             separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
             separator_targets_masks = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
@@ -340,7 +347,9 @@ class GatoPolicy(nn.Module):
             batch_tokens = torch.cat(
                 [
                     tokens for tokens in
-                    [text_tokens, image_tokens, continuous_tokens, discrete_tokens, separator_tokens, continuous_action_tokens, discrete_action_tokens]
+                    # Swap the order of image_tokens and text_tokens (GATO paper places test tokens before image tokens) for the image-caption task,
+                    # caption (which a text_tokens) should follow image instead of preceding image, so that image data can auto-regressively predict caption tokens
+                    [image_tokens, text_tokens, continuous_tokens, discrete_tokens, separator_tokens, continuous_action_tokens, discrete_action_tokens]
                     if tokens is not None
                 ],
                 dim=1,
@@ -350,7 +359,7 @@ class GatoPolicy(nn.Module):
             batch_target_masks = torch.cat(
                 [
                     targets for targets in
-                    [text_targets_masks, image_targets_masks, continuous_targets_masks, discrete_targets_masks, separator_targets_masks, continuous_action_targets_masks, discrete_action_targets_masks]
+                    [image_targets_masks, text_targets_masks, continuous_targets_masks, discrete_targets_masks, separator_targets_masks, continuous_action_targets_masks, discrete_action_targets_masks]
                     if targets is not None
                 ],
                 dim=1
@@ -359,7 +368,7 @@ class GatoPolicy(nn.Module):
             batch_embeddings = torch.cat(
                 [
                     embeddings for embeddings in
-                    [text_embeddings, image_embeddings, continuous_embeddings, discrete_embeddings]
+                    [image_embeddings, text_embeddings, continuous_embeddings, discrete_embeddings]
                     if embeddings is not None
                 ],
                 dim=1
@@ -457,6 +466,88 @@ class GatoPolicy(nn.Module):
         
         return concat_logits, predicted_tokens
 
+
+        return concat_probs, concat_pred_tokens
+    
+    # This funciton can be used to generate a response from an image, such as generating the caption or 
+    # an answer to a question about an image, it is adapted from the original predict_caption() function
+    def predict_response(self, image, prompt_tokens = [], max_length=128, deterministic=True):
+        """
+        image is in the format of 1 x 3 x H x W, where 1 is the num_images, 3 is the 3 RGB channels, default value for H and W is 256
+        prompt_tokens is a list of text tokens:
+            if the predicted response is the caption for the image, then it is an empty list
+            if the predicted response is an answer to a question about the image, then this list are the tokens of the question
+        max_length is the max length of response to be generated, will cut off at max_length
+        """
+        action_str = 'text'
+        start_token = self.token_starts[action_str]
+        end_token = self.token_ends[action_str]
+        
+        image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate response
+        n_images = image_embeddings.shape[0]
+        n_patches = image_embeddings.shape[1] 
+        assert n_images == 1, "number of images should always be 1 for predicting response"
+
+        pred_logits = None
+        response_tokens = []
+
+        for idx in range(max_length): # idx can be viewed as the index of the 'next_token' within the list of such generated response tokens
+
+            # Include 'image_embeddings' instead of 'images' below to avoid re-calculating the same image embedding in every loop
+            # Note: the following 'text' is actually text token IDs instead of actual text. Reverting back to actual text will result in an edge case
+            # where the generated tokens could contain a sequence of .... (periods) or ,,,, (commas), the tokenizer will treat the sequence as one token
+            # instead of a group of separate tokens, and raise "index out of bound" exception on "n_patches - 1 + len(prompt_tokens)" 
+            batch_dict = {
+                'image_embeddings': image_embeddings,
+                'text': torch.tensor(prompt_tokens + response_tokens)
+            }
+
+            logits, _ = self.forward([batch_dict])
+            # logits' shape is (batch_size, seq_length, vocab_size), here batch_size should always be 1
+            assert logits.shape[0] == 1, "batch size should always be 1 for predicting response"
+
+            # Each patch of an image is treated as one token (vision transformer), so n_patches is the number of tokens representing an image
+            # In the model training (fine-tuning) for image-response task, each sequence starts with image tokens, followed by the text tokens 
+            # of the corresponding response. When predicting the response from an image, we pass the image embeddings of the image tokens through 
+            # the transformer, and then auto-regressively predict the next tokens, the context info of the image is conveyed through the 
+            # self-attention mechanism. The first text token of the generated response is the "next token" predicted by the last image token 
+            # in the sequence, and the second text token is predicted by the first text token, so on and so forth. 
+
+            # In the following line of code, "n_patches - 1 + len(prompt_tokens) + idx" is the index of the token in the sequence that will 
+            # predict the next text token of the generated response
+            next_token_logits = logits[0, n_patches -1 + len(prompt_tokens) + idx, start_token:(end_token+1)]
+            if deterministic:
+                next_token = torch.argmax(next_token_logits).item()
+            else:
+                probs = F.softmax(next_token_logits)
+                next_token = torch.multinomial(probs, num_samples=1).item()
+            
+            if pred_logits is None:
+                pred_logits = next_token_logits.unsqueeze(0)
+            else:
+                pred_logits = torch.cat([pred_logits, next_token_logits.unsqueeze(0)], dim=0)
+
+            # Keep appending the next_token to the generated response tokens, continue the loop by feeding the 
+            # generated tokens along with the image embeddings into the transformer to generate the next next_token
+            response_tokens.append(next_token)
+
+
+        pred_response = self.text_tokenizer.decode(response_tokens)
+
+        # The logits for all of the predicted "next_token"'s as tokens in the predicted response
+        # squeeze shape (1, max_length, self.text_tokens) to (max_length, self.text_tokens), 
+        #pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches - 1 + len(prompt_tokens) + max_length, :self.text_tokens].squeeze(0)  
+
+        return pred_logits, pred_response 
+    
+    def predict_caption(self, image, max_length=128, deterministic=True):
+        pred_logits, pred_caption =  self.predict_response(image, prompt_tokens = [], max_length=max_length, deterministic=deterministic)
+        return pred_logits, pred_caption
+
+    def predict_answer(self, image, question, max_length=16, deterministic=True):
+        prompt_tokens = self.text_tokenizer.encode(question)
+        pred_logits, pred_answer =  self.predict_response(image, prompt_tokens = prompt_tokens, max_length=max_length, deterministic=deterministic)
+        return pred_logits, pred_answer
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
     def predict_control(self, input: dict, task: ControlTask, deterministic: bool = True):
