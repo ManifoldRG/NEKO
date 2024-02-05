@@ -1,5 +1,5 @@
 # Assume all datasets are downloaded and available from local directories
-from gato.tasks.task import Task, TaskTypeEnum
+from gato.tasks.task import Task
 
 import os
 import tarfile
@@ -19,10 +19,9 @@ import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
 class CaptionTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, tokenizer_model:str, caption_dataset, train_data, test_data = [],
+    def __init__(self, tokenizer_model:str, caption_dataset, train_data, test_data = [],
                  test_data_prop = 0.1, test_data_mask_file = None):
         """
-        task_type should be CAPTION
         caption_dataset is the directory for all of the data (training and test)
         train_data and test_data are list of sub_diretories under caption_dataset, with each directory containing 
         one training or test dataset which is composed of multiple .tar files downloaded with img2dataset. 
@@ -36,7 +35,7 @@ class CaptionTask(Task):
         during training phase when the dataset is separated into a training set and and a test set 
         And this mask keeps track of the indices of test data in the dataset.  
         """
-        super().__init__(task_type)
+        super().__init__()
 
         if not caption_dataset.endswith('/'):
             caption_dataset = caption_dataset + '/'
@@ -162,7 +161,7 @@ class CaptionTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directory with your data directory
-    task = CaptionTask(task_type = 'caption', tokenizer_model = 'gpt2', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
+    task = CaptionTask(tokenizer_model = 'gpt2', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
                        train_data = ['train'], test_data = ['test'], test_data_prop = 0.1)
 
     #print(task.dataset["train"][4]["images"][0][1][10])

@@ -4,9 +4,12 @@ import os
 import wandb
 import numpy as np
 import torch
+from gato.tasks.control_task import ControlTask
+from gato.tasks.text_task import TextTask
+from gato.tasks.caption_task import CaptionTask
+from gato.tasks.vqa_task import VqaTask
 
 from gato.utils.utils import save_model
-from gato.tasks.task import TaskTypeEnum
 
 class Trainer:
     def __init__(
@@ -79,21 +82,21 @@ class Trainer:
         with torch.no_grad():
             for task in self.tasks:
                 eval_logs = {}
-                if task.task_type == TaskTypeEnum.CONTROL.value:
+                if isinstance(task, ControlTask):
                     if self.args.eval_episodes > 0 :
                         eval_logs = task.evaluate(self.model, n_iterations=self.args.eval_episodes, deterministic=self.deterministic, promptless_eval=self.args.promptless_eval)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/{task.name}/{k}'] = v
-                elif task.task_type == TaskTypeEnum.TEXT.value:
+                elif isinstance(task, TextTask):
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
                     pass
-                elif task.task_type == TaskTypeEnum.CAPTION.value:
+                elif isinstance(task, CaptionTask):
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_caption_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_caption_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/caption/{k}'] = v
-                elif task.task_type == TaskTypeEnum.VQA.value:
+                elif isinstance(task, VqaTask):
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_vqa_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_caption_log_examples)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/VQA/{k}'] = v
@@ -185,21 +188,21 @@ class Trainer:
 
     def sample_text_batch(self, batch_size):
         batch_dicts = []
-        text_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.TEXT.value]
+        text_tasks = [t for t in self.tasks if isinstance(t, TextTask)]
         for i,task in enumerate (text_tasks):
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
 
     def sample_caption_batch(self, batch_size):
         batch_dicts = []
-        caption_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CAPTION.value]
+        caption_tasks = [t for t in self.tasks if isinstance(t, CaptionTask)]
         for i,task in enumerate (caption_tasks):
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
     
     def sample_vqa_batch(self, batch_size):
         batch_dicts = []
-        vqa_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.VQA.value]
+        vqa_tasks = [t for t in self.tasks if isinstance(t, VqaTask)]
         for i,task in enumerate (vqa_tasks):
             batch_dicts.extend(task.sample_batch(batch_size))
         return batch_dicts
@@ -208,7 +211,7 @@ class Trainer:
         batch_dicts = []
 
         sampled_task_indices = []
-        control_tasks = [t for t in self.tasks if t.task_type == TaskTypeEnum.CONTROL.value]
+        control_tasks = [t for t in self.tasks if isinstance(t, ControlTask)]
         n_tasks = len(control_tasks)
         while len(sampled_task_indices) < batch_size:
             max_n = min(n_tasks, batch_size - len(sampled_task_indices))
@@ -216,7 +219,6 @@ class Trainer:
             sampled_task_indices.extend(new_tasks)
 
         n_prompted_episodes = round(batch_size * self.args.prompt_ep_proportion)
-        vanilla_batch_size = batch_size - n_prompted_episodes
 
         # determine prompted episodes and their prompting type (end or uniform)
         prompt_indices = np.random.choice(batch_size, size=n_prompted_episodes, replace=False).tolist()

@@ -1,5 +1,5 @@
 # Assume all datasets are downloaded and available from local directories
-from gato.tasks.task import Task, TaskTypeEnum
+from gato.tasks.task import Task
 
 import os
 from PIL import Image
@@ -15,13 +15,12 @@ import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
 class VqaTask(Task): 
-    def __init__(self, task_type: TaskTypeEnum, tokenizer_model:str,
+    def __init__(self, tokenizer_model:str,
                  vqa_dataset, train_data, test_data, 
                  train_img_name_prefix, train_img_file_name_len, 
                  test_img_name_prefix, test_img_file_name_len,
                  questions_file, annotations_file):
         """
-        task_type should be VQA
         vqa_dataset is the directory where the data for vqa task is located, should end with "/" 
         train_data and test_data are each a list of sub directories where training data and test data are located
         ***_img_name_prefix is a list, each item of the list holds the image file name prefix for each sub directory
@@ -31,7 +30,7 @@ class VqaTask(Task):
         For the current implementaiton, it is required that these files are named "questions.json" and "annotations.json" under each sub diredctory
         Each sub directory should also contain the image files associated with the corresponding question and annotation files
         """
-        super().__init__(task_type)
+        super().__init__()
 
         assert len(train_data) == len(test_data), "Number of training data and test data sub director must be equal to each other" 
 
@@ -53,18 +52,12 @@ class VqaTask(Task):
             if not data_directory.endswith('/'):
                 data_directory = data_directory + '/'
 
-            try:
-                with open(data_directory + annotations_file, 'r') as json_file:
-                    # This is a list, each item contains an image ID, a question ID, and its corresponding answers (multiple answers to one question)
-                    annotations = json.load(json_file)['annotations'] 
-            except:
-                print(f"{data_directory} does not have a annotations json file, or it is not named as annotations.json")
+            with open(data_directory + annotations_file, 'r') as json_file:
+                # This is a list, each item contains an image ID, a question ID, and its corresponding answers (multiple answers to one question)
+                annotations = json.load(json_file)['annotations'] 
 
-            try:
-                with open(data_directory + questions_file, 'r') as json_file:
-                    questions = json.load(json_file)['questions'] # This is a list of question IDs and the corresponding questions
-            except:
-                print(f"{data_directory} does not have an questions json file, or it is not named as questions.json")
+            with open(data_directory + questions_file, 'r') as json_file:
+                questions = json.load(json_file)['questions'] # This is a list of question IDs and the corresponding questions
 
             assert len(annotations) == len(questions), "Number of annotations must be equal to number of questions" 
         
@@ -153,8 +146,7 @@ class VqaTask(Task):
 # test code
 if __name__ == '__main__':
     # replace the following directories and files names with your directories and files
-    task = VqaTask(task_type                = 'vqa', 
-                   vqa_dataset              = '/home/<user name>/Git/NEKO/VQA_Data/',
+    task = VqaTask(vqa_dataset              = '/home/<user name>/Git/NEKO/VQA_Data/',
                    train_data               = ['train2014'], 
                    test_data                = ['val2014'],
                    train_img_name_prefix    = ['COCO_train2014_'], 
