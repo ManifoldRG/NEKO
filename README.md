@@ -6,19 +6,15 @@ This implementation is currently in progress.
 
 ## Vision
 
-The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
+The NEKO Project is an open source effort to build a "generalist" model of greater scale and capability as that reported in DeepMind’s 2022 Paper, [A Generalist Agent](https://web.archive.org/web/20231005220217/https://www.deepmind.com/publications/a-generalist-agent). This constitutes the first major step in a longer goal of building multimodal, multiobjective models that work well across a variety of domains.
 
-Ultimately, collective high performance across many objectives in varied modalities constitutes a SoTA direction. We hope that in building such models and making them open source, we can move humanity’s collective understanding and capability in building complex AI systems forward.
-
-Practically, building these systems provides us deeper understanding into the utility and mechanics of modern deep learning approaches in building better representational capability and scaling to new problem domains. Put another way, this research direction serves as an excellent foundation to test other, new kinds of general AI approaches to build next generation learning systems. 
-
-## [NEKO Project Roadmap](https://docs.google.com/document/d/e/2PACX-1vQ2JVJvSiYmwjDFnppj0_38NCUEdLG8pAdj0Q2tSy1yy4wwQxJOAAzNFwz2Is4TONhgUVnvJzuu5o85/pub)
+## [NEKO Project Roadmap](https://docs.google.com/document/d/e/2PACX-1vQELDXCIT9tn7Uq5vxQG4_3HsrkQcuBRqvXm-MkxW06Zkh-LP3G9z7TP7a-2MNWyA/pub)
 
 ## [NEKO Open Issues and Tasks](https://github.com/orgs/ManifoldRG/projects/12)
 
 ## [Contributing Guide](https://github.com/ManifoldRG/NEKO/blob/master/CONTRIBUTING.md)
 
-## [GATO-Control Implementation](https://github.com/ManifoldRG/gato-control/tree/master/gato)
+## [NEKO Implementation](https://github.com/ManifoldRG/NEKO/tree/master/gato)
 
 If you use this project, we'd love for you to refer back to Manifold in your code!
 
@@ -39,7 +35,7 @@ cd ..
 python ./gato/data/download_custom_datasets.py
 ```
 
-(this will only download MuJoCo datasets, but refer to file for downloading others like [Breakout](https://drive.google.com/drive/folders/1Elos7A-NbpDzr5bPpPmoM-_2qY_68KFi?usp=drive_link))
+(this will only download MuJoCo datasets, but refer to file for downloading others like [Breakout](https://drive.google.com/drive/folders/1cFGsa1uLr6VrbpkHuL9NiEohgcch7r0k?usp=sharing))
 
 ## Docker
 
@@ -78,6 +74,18 @@ In general, control_datasets can contain lists of any strings in download_custom
 can mix in a single run, e.g:
 `--control_datasets Breakout-top1-s1-v0 hammer-expert-v0`
 
+Training Image-Caption (in progress):
+```bash
+python train.py --use_wandb --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=10 --batch_size=4 -k=240 --eval_episodes=10 --sequence_length=1024 --activation_fn=gelu --save_model --caption_prop=1.0 --caption_dataset="/<your data path>/Caption_Data" --caption_train_data=train --caption_test_data=test
+```
+Training VQA (in progress):
+```bash
+python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=10 --batch_size=4 -k=240 --eval_episodes=10 --sequence_length=1024 --activation_fn=gelu --save_model --vqa_prop=1.0 --vqa_dataset='/<your data path>/VQA_Data/' --vqa_train_data=train2014 --vqa_test_data=val2014 --train_img_name_prefix=COCO_train2014_ --train_img_file_name_len=27 --test_img_name_prefix=COCO_val2014_ --test_img_file_name_len=25
+```
+The `--caption_prop` and `--vqa_prop` are the proportions of samples of data from each of the two tasks (cation and VQA) that are used for the model. Such proportions from all tasks (control tasks such Atari, and non-control tasks, such as text, image-caption, VQA) should sum up to 1.0 if multiple tasks are trained simultaneously, which should be the case for normal training. The above-mentioned examples single out each task for demo and test purpose.
+
+The Image-Caption and VQA tasks can be tested on Colab, we have a few Colab Notebooks for that purpose in the NEKO/misc folder
+
 ## Atari Datasets
 All Atari datasets now follow the convention of `{Name}-top1-s1-v0`, e.g. `Breakout-top1-s1-v0`. Previously, we old runs may have `Breakout-expert_s0-v0` which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
 
@@ -85,6 +93,27 @@ You will be able to train on any env in https://github.com/ManifoldRG/gato-contr
 
 Currently, only Breakout is provided here for testing but others will be available shortly. 
 
+## Image-Caption Datasets
+So far we have identified two datasets, and the number can increase in the future. For both datasets, we have used a tool "img2dataset" to download the data into webdataset format -
+- Data are downloaded into .tar files, each .tar file contains multiple bundles
+- Each bundle contains: 
+One image in jpg format resized to the designated size (256*256 by default)
+One txt file that is the caption for the image 
+One .json file that is the metadata for this bundle (the URL of the image, the caption, the image size, etc.)
+
+At the time when the Image-Caption task is instantiated, it processes the downlaoded data into the format that can be accepted by the model for training. So far the task can only process data in webdataset format. As more data sources are identified, different methods to process data may be added when necessary
+
+The two datasets for Image-Caption task:
+- https://github.com/rom1504/img2dataset/blob/main/dataset_examples/cc3m.md
+Follow the instruction there to download the data, and the metadata file name mentioned on the page "cc3m.tsv" might be different from the most up to date source URL: https://ai.google.com/research/ConceptualCaptions/download
+    
+- https://github.com/rom1504/img2dataset/blob/main/dataset_examples/mscoco.md
+Simply follow insturctions to download the dataset
+
+## VQA Datasets
+So far, we have identified one dataset: https://okvqa.allenai.org/download.html, follow the instruction to download. Each download includes a questions json file and an annotations json files to list the image IDs and the questions and their answers associated with each image ID, and the image files with the image IDs as part of the image file names.
+
+At the time when the VQA task is instantiated, it processes the downloaded data into the format that can be accepted by the model for training. So far the task can only process data in this specific format. As more data sources are identified, different methods to process data may be added when necessary
 
 ## Evaluation
 ```bash
@@ -126,7 +155,7 @@ logits, loss = model([
 
 # Pretrained models
 
-We provide some pretrained models, which are not geared for high-performance or reliable external use, but to aid in our open-source development. These can be found for [3 MuJoCo tasks](https://drive.google.com/drive/folders/1hws2ip5SKU6KLOVfRU_N8GNPTHPkxVLP?usp=sharing) and [Breakout](https://drive.google.com/drive/folders/1qzUaY6Qh_MmS8o0EqDw3OL55H3Yn6yxe?usp=sharing). Other models may be added [here](https://drive.google.com/drive/folders/1xVo462ZAs54DxsYTsp7NxmCGvrGVBMFj?usp=sharing) where the directory contains checkpoints, arguments, and link to WandB run in each info.txt.
+We provide some pretrained models, which are not geared for high-performance or reliable external use, but to aid in our open-source development. These can be found for [3 MuJoCo tasks](https://drive.google.com/drive/folders/1DTGskCFq36nnTvjIs6vsoHw-E8wEiZ8Y?usp=sharing) and [Breakout](https://drive.google.com/drive/folders/1cFGsa1uLr6VrbpkHuL9NiEohgcch7r0k?usp=sharing). Other models may be added [here](https://drive.google.com/drive/folders/1eJWk4hYRlWlwqq-IsBXZ90DvZvirzH0F?usp=sharing) where the directory contains checkpoints, arguments, and link to WandB run in each info.txt.
 
 # Future
 Our implementation does not directly mirror Gato. Features left out or planned to be added in the future can be found in [todo.md](https://github.com/ManifoldRG/gato-control/blob/master/misc/todo.md). We are working on adding modular tasks, check out the Issues tab.

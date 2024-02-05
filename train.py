@@ -1,6 +1,7 @@
 import argparse
 import random
 import os
+from datetime import datetime
 
 import wandb
 import torch
@@ -9,7 +10,6 @@ from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
 from accelerate import DistributedDataParallelKwargs
 
-import transformers
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
@@ -18,7 +18,8 @@ from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
-from gato.tasks.task import TaskTypeEnum
+from gato.tasks.caption_task import CaptionTask
+from gato.tasks.vqa_task import VqaTask
 
 
 def main(args):
@@ -27,15 +28,14 @@ def main(args):
     device = accelerator.device
     args.device = accelerator.device
 
-    exp_id = random.randint(int(1e5), int(1e6) - 1)
-    exp_name = f'neko-gato-{exp_id}'
+    exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
+    exp_name = f'neko-gato_{exp_date}'
 
     tasks = []
     # add control datasets and env
     envs, control_datasets = load_envs(args.control_datasets) # Load Minari datasets and corresponding Gym environments
     for env, dataset in zip(envs, control_datasets):
         task = ControlTask(
-            TaskTypeEnum.CONTROL.value,
             env.unwrapped.spec.id,
             env,
             dataset,
@@ -49,9 +49,26 @@ def main(args):
     
     if len(args.text_datasets) > 0:
         # add text datasets
-        tasks.append(TextTask(TaskTypeEnum.TEXT.value, args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
+        tasks.append(TextTask(args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name))
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
+ 
+    if len(args.caption_dataset) > 0:
+        # add caption datasets
+        tasks.append(CaptionTask(args.tokenizer_model_name, args.caption_dataset, args.caption_train_data, args.caption_test_data, args.test_data_prop))
+    else:
+        assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
+    
+    if len(args.vqa_dataset) > 0:
+        # add vqa datasets
+        tasks.append(VqaTask(args.tokenizer_model_name, 
+                             args.vqa_dataset, args.vqa_train_data, args.vqa_test_data, 
+                             args.train_img_name_prefix, args.train_img_file_name_len, 
+                             args.test_img_name_prefix, args.test_img_file_name_len, 
+                             args.questions_file, args.annotations_file))
+    else:
+        assert (args.vqa_prop == 0), 'vqa_prop must be 0 if no text datasets are specified'
+
 
     model = GatoPolicy(
         device=args.device,
@@ -129,7 +146,6 @@ def main(args):
         exp_name = exp_name,
         args=args
     )
-
     trainer.train()
 
 
@@ -183,7 +199,9 @@ if __name__ == '__main__':
     parser.add_argument('--lora_dropout', type=float, default=0.1)
 
     # training hyperparameters
-    parser.add_argument('--text_prop', type=float, default=0.5) # proportion of text data in batch
+    parser.add_argument('--text_prop', type=float, default=0) # proportion of text data in batch
+    parser.add_argument('--caption_prop', type=float, default=0) # proportion of image caption data in batch
+    parser.add_argument('--vqa_prop', type=float, default=0) # proportion of vqa data in batch
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1) # simulate larger batch size
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--dropout', type=float, default=0.1)
@@ -218,8 +236,30 @@ if __name__ == '__main__':
 
     # datasets / envs
     parser.add_argument('--control_datasets', type=str, nargs='+', default=[])
+
     parser.add_argument('--text_datasets', type=str, nargs='+', default=[]) # ['wikitext-2-v1']
     parser.add_argument('--text_datasets_paths', type=str, nargs='+', default=[]) # ['wikitext']
+
+    parser.add_argument('--caption_dataset', type=str, default='') # the directory for all of the data (training and test)
+    parser.add_argument('--caption_train_data', type=str, nargs='+', default=[]) # list of sub directories for training data
+    parser.add_argument('--caption_test_data', type=str, nargs='+', default=[]) # list of sub directories for test data
+    parser.add_argument('--test_data_prop', type=str, nargs='+', default=0.1) # the proportion of test data if needing to split training dataset into training and test
+    
+    parser.add_argument('--vqa_dataset', type=str, default='') # the directory for all of the data (traing and test)
+    parser.add_argument('--vqa_train_data', type=str, nargs='+', default=[]) # list of sub directories for training data
+    parser.add_argument('--vqa_test_data', type=str, nargs='+', default=[]) # list of sub directories for test data
+    parser.add_argument('--train_img_name_prefix', type=str, nargs='+', default=[]) # each sub directory has one such image name file prefix
+    parser.add_argument('--train_img_file_name_len', type=int, nargs='+', default=[]) # each sub directory has one such image file name length
+    parser.add_argument('--test_img_name_prefix', type=str, nargs='+', default=[]) # each sub directory has one such image name file prefix
+    parser.add_argument('--test_img_file_name_len', type=int, nargs='+', default=[]) # each sub directory has one such image file name length
+    parser.add_argument('--questions_file', type=str, default='questions.json') # it is required to give the same name to all questions json files (no ambiguity since they are under different directories)
+    parser.add_argument('--annotations_file', type=str, default='annotations.json') # it is required to give the same name to all annotations json files (no ambiguity since they are under different directories)
+
+    parser.add_argument('--eval_caption_num_examples', type=int, default=100)
+    parser.add_argument('--eval_caption_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
+
+    parser.add_argument('--eval_vqa_num_examples', type=int, default=100)
+    parser.add_argument('--eval_vqa_log_examples', action='store_true', default=False) # for debugging if you wish to show predictions from model in eval for text
 
     # params for sampling from datasets
     parser.add_argument('--prompt_ep_proportion', type=float, default=0.25) # proportion of episodes that are prompted
