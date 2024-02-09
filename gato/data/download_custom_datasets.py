@@ -1,6 +1,11 @@
 import os
 import gdown
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 datasets = {
     'd4rl_halfcheetah-expert-v2': 'https://drive.google.com/drive/folders/1YcUMTS7cMrUP8KJ6aQL87D9uYnrvGT02?usp=drive_link',
     'd4rl_hopper-expert-v2': 'https://drive.google.com/drive/folders/1upUt_aCRc3MCWhfVwpDlnW7YoVFEHre9?usp=drive_link',
