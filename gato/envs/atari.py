@@ -2,6 +2,10 @@ import gymnasium as gym
 from gymnasium.wrappers import AtariPreprocessing, TransformReward 
 import numpy as np
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
 
 def load_atari_env(env_name: str, load_kwargs: dict):
     assert 'v5' in env_name

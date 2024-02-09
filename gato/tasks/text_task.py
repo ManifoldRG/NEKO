@@ -9,6 +9,11 @@ from transformers import AutoTokenizer
 import torch
 import copy
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 if TYPE_CHECKING:
     from gato.policy.gato_policy import GatoPolicy
 

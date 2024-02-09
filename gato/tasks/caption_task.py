@@ -18,6 +18,11 @@ import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 class CaptionTask(Task): 
     def __init__(self, tokenizer_model:str, caption_dataset, train_data, test_data = [],
                  test_data_prop = 0.1, test_data_mask_file = None):

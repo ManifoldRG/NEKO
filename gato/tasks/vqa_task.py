@@ -14,6 +14,11 @@ import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 class VqaTask(Task): 
     def __init__(self, tokenizer_model:str,
                  vqa_dataset, train_data, test_data, 

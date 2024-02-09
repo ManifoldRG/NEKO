@@ -12,6 +12,11 @@ from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 if TYPE_CHECKING:
     from gato.tasks.control_task import ControlTask
 

@@ -11,6 +11,11 @@ from gato.tasks.vqa_task import VqaTask
 
 from gato.utils.utils import save_model
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 class Trainer:
     def __init__(
         self,

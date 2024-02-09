@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 import math
 
+# import logger
+import logging
+logger = logging.getLogger(__name__)
+# Example of use logger.debug(f'foobar')
+
 def mu_law(tensor, mu=100, M=256):
     return torch.sign(tensor) * torch.log(1 + mu * torch.abs(tensor)) / math.log(1 + mu*M) #torch.log(1 + mu*M)
 
