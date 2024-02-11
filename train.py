@@ -1,5 +1,5 @@
 import argparse
-import random
+import logging
 import os
 from datetime import datetime
 
@@ -20,6 +20,8 @@ from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
 from gato.tasks.caption_task import CaptionTask
 from gato.tasks.vqa_task import VqaTask
+
+logger = logging.getLogger(__name__)
 
 
 def main(args):
@@ -101,12 +103,12 @@ def main(args):
 
     if args.init_checkpoint is not None:
         with accelerator.main_process_first():
-            print('Loading model from checkpoint:', args.init_checkpoint)
+            logger.info('Loading model from checkpoint:', args.init_checkpoint)
             model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
 
     # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print('Trainable Parameters:', '{}M'.format(params / 1e6))
+    logger.info('Trainable Parameters:', '{}M'.format(params / 1e6))
     args.trainable_params = params
 
 

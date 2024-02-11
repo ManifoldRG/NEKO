@@ -4,11 +4,6 @@ from copy import deepcopy
 
 import torch
 
-# import logger
-import logging
-logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
-
 class DotDict(dict):
     """dot.notation access to dictionary attributes"""
 

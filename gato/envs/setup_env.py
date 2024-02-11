@@ -3,11 +3,6 @@ import gymnasium as gym
 
 from gato.envs.atari import load_atari_env, TRAIN_GAMES as ATARI_TRAIN, TEST_GAMES as ATARI_TEST
 
-# import logger
-import logging
-logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
-
 custom_env_loaders = {
     'ALE/': load_atari_env
 }

@@ -1,6 +1,7 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task
 
+import logging
 import os
 import tarfile
 import webdataset as wds
@@ -18,10 +19,7 @@ import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
-# import logger
-import logging
 logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
 
 class CaptionTask(Task): 
     def __init__(self, tokenizer_model:str, caption_dataset, train_data, test_data = [],
@@ -127,11 +125,11 @@ class CaptionTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.dataset['test']):
-            print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.info(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.dataset['test'])
 
         if log_examples_to_output:
-            print(f'--- examples ---')
+            logger.info(f'--- examples ---')
 
         random_indices = [random.randint(0, len(self.dataset['test'])-1) for _ in range(num_examples_to_test)]
         selected_examples = [self.dataset['test'][idx] for idx in random_indices]
@@ -144,15 +142,15 @@ class CaptionTask(Task):
             # Generate prediction
             pred_logits, pred_caption = model.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
-                print(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
-                print("----")
+                logger.info(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
+                logger.info("----")
 
             # Calculate loss
             loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
         if log_examples_to_output:
-            print(f'--- examples end ---')
+            logger.info(f'--- examples end ---')
 
         avg_loss = total_loss / num_examples_to_test
         perplexity = torch.exp(torch.tensor(avg_loss))
@@ -169,13 +167,13 @@ if __name__ == '__main__':
     task = CaptionTask(tokenizer_model = 'gpt2', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
                        train_data = ['train'], test_data = ['test'], test_data_prop = 0.1)
 
-    #print(task.dataset["train"][4]["images"][0][1][10])
-    #print(task.dataset["train"][4]["images"][0][2][15])
-    #print(task.dataset["train"][4]["text"])
+    #logger.info(task.dataset["train"][4]["images"][0][1][10])
+    #logger.info(task.dataset["train"][4]["images"][0][2][15])
+    #logger.info(task.dataset["train"][4]["text"])
     batch = task.sample_batch(5)
-    #print(batch)
-    print(type(batch))
-    print(batch[0]['images'][0][1][10])
-    print(batch[0]['images'][0][2][15])
-    print(batch[0]['images'].shape)
-    print(batch[0]['text'])
+    #logger.info(batch)
+    logger.info(type(batch))
+    logger.info(batch[0]['images'][0][1][10])
+    logger.info(batch[0]['images'][0][2][15])
+    logger.info(batch[0]['images'].shape)
+    logger.info(batch[0]['text'])

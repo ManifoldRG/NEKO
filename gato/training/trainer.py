@@ -1,3 +1,4 @@
+import logging
 import time
 import os
 
@@ -11,10 +12,7 @@ from gato.tasks.vqa_task import VqaTask
 
 from gato.utils.utils import save_model
 
-# import logger
-import logging
 logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
 
 class Trainer:
     def __init__(
@@ -113,11 +111,11 @@ class Trainer:
 
         if self.accelerator.is_main_process:
             if self.print_logs:
-                print('=' * 80)
-                print(f'Iteration {iter}')
+                logger.info('=' * 80)
+                logger.info(f'Iteration {iter}')
                 for k, v in logs.items():
-                    print(f'{k}: {v}')
-                print('=' * 80)
+                    logger.info(f'{k}: {v}')
+                logger.info('=' * 80)
 
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':

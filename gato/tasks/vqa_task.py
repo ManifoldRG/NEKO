@@ -1,6 +1,7 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task
 
+import logging
 import os
 from PIL import Image
 import io # need to use BytesIO
@@ -14,10 +15,7 @@ import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
-# import logger
-import logging
 logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
 
 class VqaTask(Task): 
     def __init__(self, tokenizer_model:str,
@@ -109,11 +107,11 @@ class VqaTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.dataset['test']):
-            print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.info(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.dataset['test'])
 
         if log_examples_to_output:
-            print(f'--- examples ---')
+            logger.info(f'--- examples ---')
 
         random_indices = [random.randint(0, len(self.dataset['test'])-1) for _ in range(num_examples_to_test)]
         selected_examples = [self.dataset['test'][idx] for idx in random_indices]
@@ -128,15 +126,15 @@ class VqaTask(Task):
             # Generate prediction
             pred_logits, pred_answer = model.predict_answer(image, question, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
-                print(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
-                print("----")
+                logger.info(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
+                logger.info("----")
 
             # Calculate loss
             loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
         if log_examples_to_output:
-            print(f'--- examples end ---')
+            logger.info(f'--- examples end ---')
 
         avg_loss = total_loss / num_examples_to_test
         perplexity = torch.exp(torch.tensor(avg_loss))
@@ -163,10 +161,9 @@ if __name__ == '__main__':
                    )
 
     batch = task.sample_batch(5)
-    print(type(batch))
-    print(list(batch[0].keys()))
-    print(batch[0]['images'][0][1][10])
-    print(batch[0]['images'][0][2][15])
-    print(batch[0]['images'].shape)
-    print(batch[0]['text'])
-
+    logger.info(type(batch))
+    logger.info(list(batch[0].keys()))
+    logger.info(batch[0]['images'][0][1][10])
+    logger.info(batch[0]['images'][0][2][15])
+    logger.info(batch[0]['images'].shape)
+    logger.info(batch[0]['text'])

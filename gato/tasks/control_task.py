@@ -8,11 +8,6 @@ import minari
 from minari.dataset.minari_dataset import EpisodeData
 from gato.tasks.task import Task
 
-# import logger
-import logging
-logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
-
 if TYPE_CHECKING:
     from gato.policy.gato_policy import GatoPolicy
 

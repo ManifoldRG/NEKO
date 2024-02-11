@@ -1,6 +1,7 @@
 import argparse
-import os
 import json
+import logging
+import os
 import time
 
 import torch
@@ -8,11 +9,12 @@ import torch
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
 
-
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.tasks.control_task import ControlTask
+
+logger = logging.getLogger(__name__)
 
 
 def main(args):
@@ -57,7 +59,7 @@ def main(args):
         )
         env_names.append(env.unwrapped.spec.id)
         tasks.append(task)
-    print('Evaluating on envs:', env_names)
+    logger.info('Evaluating on envs:', env_names)
 
     if len(args.text_datasets) > 0:
         # add text datasets
@@ -115,10 +117,10 @@ def main(args):
 
     logs['time/evaluation'] = time.time() - eval_start
 
-    print('=' * 80)
-    print(f'Evaluation results:')
+    logger.info('=' * 80)
+    logger.info(f'Evaluation results:')
     for k, v in logs.items():
-        print(f'{k}: {v}')
+        logger.info(f'{k}: {v}')
 
 
 if __name__ == '__main__':
