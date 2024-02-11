@@ -14,7 +14,7 @@ The NEKO Project is an open source effort to build a "generalist" model of great
 
 ## [Contributing Guide](https://github.com/ManifoldRG/NEKO/blob/master/CONTRIBUTING.md)
 
-## [GATO-Control Implementation](https://github.com/ManifoldRG/gato-control/tree/master/gato)
+## [NEKO Implementation](https://github.com/ManifoldRG/NEKO/tree/master/gato)
 
 If you use this project, we'd love for you to refer back to Manifold in your code!
 
@@ -74,6 +74,18 @@ In general, control_datasets can contain lists of any strings in download_custom
 can mix in a single run, e.g:
 `--control_datasets Breakout-top1-s1-v0 hammer-expert-v0`
 
+Training Image-Caption (in progress):
+```bash
+python train.py --use_wandb --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=10 --batch_size=4 -k=240 --eval_episodes=10 --sequence_length=1024 --activation_fn=gelu --save_model --caption_prop=1.0 --caption_dataset="/<your data path>/Caption_Data" --caption_train_data=train --caption_test_data=test
+```
+Training VQA (in progress):
+```bash
+python train.py --embed_dim=768 --layers=6 --heads=24 --training_steps=1000 --log_eval_freq=10 --warmup_steps=10 --batch_size=4 -k=240 --eval_episodes=10 --sequence_length=1024 --activation_fn=gelu --save_model --vqa_prop=1.0 --vqa_dataset='/<your data path>/VQA_Data/' --vqa_train_data=train2014 --vqa_test_data=val2014 --train_img_name_prefix=COCO_train2014_ --train_img_file_name_len=27 --test_img_name_prefix=COCO_val2014_ --test_img_file_name_len=25
+```
+The `--caption_prop` and `--vqa_prop` are the proportions of samples of data from each of the two tasks (cation and VQA) that are used for the model. Such proportions from all tasks (control tasks such Atari, and non-control tasks, such as text, image-caption, VQA) should sum up to 1.0 if multiple tasks are trained simultaneously, which should be the case for normal training. The above-mentioned examples single out each task for demo and test purpose.
+
+The Image-Caption and VQA tasks can be tested on Colab, we have a few Colab Notebooks for that purpose in the NEKO/misc folder
+
 ## Atari Datasets
 All Atari datasets now follow the convention of `{Name}-top1-s1-v0`, e.g. `Breakout-top1-s1-v0`. Previously, we old runs may have `Breakout-expert_s0-v0` which is depreciated. These datasets are top-1% dqn-replay converted to Minari, refer [here](https://github.com/daniellawson9999/data-tests#port) for more details.
 
@@ -81,6 +93,27 @@ You will be able to train on any env in https://github.com/ManifoldRG/gato-contr
 
 Currently, only Breakout is provided here for testing but others will be available shortly. 
 
+## Image-Caption Datasets
+So far we have identified two datasets, and the number can increase in the future. For both datasets, we have used a tool "img2dataset" to download the data into webdataset format -
+- Data are downloaded into .tar files, each .tar file contains multiple bundles
+- Each bundle contains: 
+One image in jpg format resized to the designated size (256*256 by default)
+One txt file that is the caption for the image 
+One .json file that is the metadata for this bundle (the URL of the image, the caption, the image size, etc.)
+
+At the time when the Image-Caption task is instantiated, it processes the downlaoded data into the format that can be accepted by the model for training. So far the task can only process data in webdataset format. As more data sources are identified, different methods to process data may be added when necessary
+
+The two datasets for Image-Caption task:
+- https://github.com/rom1504/img2dataset/blob/main/dataset_examples/cc3m.md
+Follow the instruction there to download the data, and the metadata file name mentioned on the page "cc3m.tsv" might be different from the most up to date source URL: https://ai.google.com/research/ConceptualCaptions/download
+    
+- https://github.com/rom1504/img2dataset/blob/main/dataset_examples/mscoco.md
+Simply follow insturctions to download the dataset
+
+## VQA Datasets
+So far, we have identified one dataset: https://okvqa.allenai.org/download.html, follow the instruction to download. Each download includes a questions json file and an annotations json files to list the image IDs and the questions and their answers associated with each image ID, and the image files with the image IDs as part of the image file names.
+
+At the time when the VQA task is instantiated, it processes the downloaded data into the format that can be accepted by the model for training. So far the task can only process data in this specific format. As more data sources are identified, different methods to process data may be added when necessary
 
 ## Evaluation
 ```bash

@@ -218,7 +218,9 @@ class TrainingArgs:
     lora_dropout: float = field(default=0.1)
 
     # Training hyperparameters
-    text_prop: float = field(default=0.5) # proportion of text data in batch
+    text_prop: float = field(default=0.0) # proportion of text data in batch
+    caption_prop: float = field(default=0.0) # proportion of caption data in batch
+    vqa_prop: float = field(default=0.0) # proportion of text vqa in batch
     gradient_accumulation_steps: int = field(default=1) # simulate larger batch size
     batch_size: int = field(default=512)
     dropout: float = field(default=0.1)
@@ -251,9 +253,31 @@ class TrainingArgs:
     eval_text_log_examples: bool = field(default=False) # for debugging if you wish to show predictions from model in eval for text
 
     # Datasets / envs
-    control_datasets: List[str] = field(default_factory=list, metadata={"nargs": "+"})
-    text_datasets: List[str] = field(default_factory=list, metadata={"nargs": "+"}) # ['wikitext-2-v1']
-    text_datasets_paths: List[str] = field(default_factory=list, metadata={"nargs": "+"}) # ['wikitext']
+    control_datasets: List[str] = field(default_factory=list, metadata={'nargs': '+'})
+    text_datasets: List[str] = field(default_factory=list, metadata={'nargs': '+'}) # ['wikitext-2-v1']
+    text_datasets_paths: List[str] = field(default_factory=list, metadata={'nargs': '+'}) # ['wikitext']
+
+    # Caption/VQA datasets
+    caption_dataset: str = field(default='') # the directory for all of the data (training and test)
+    caption_train_data: List[str] = field(default_factory=list, metadata={'nargs': '+'}) # list of sub directories for training data
+    caption_test_data: List[str] = field(default_factory=list, metadata={'nargs': '+'}) # list of sub directories for test data
+    test_data_prop: float = field(default=0.1) # the proportion of test data if needing to split training dataset into training and test
+
+    vqa_dataset: str = field(default='') # the directory for all of the data (training and test)
+    vqa_train_data: List[str] = field(default_factory=list, metadata={'nargs': '+'}) # list of sub directories for training data
+    vqa_test_data: List[str] = field(default_factory=list, metadata={'nargs': '+'}) # list of sub directories for test data
+    train_img_name_prefix: List[str] = field(default_factory=list) # each sub directory has one such image name file prefix
+    train_img_file_name_len: List[int] = field(default_factory=list)  # each sub directory has one such image name file length
+    test_img_name_prefix: List[str] = field(default_factory=list) # each sub directory has one such image name file prefix
+    test_img_file_name_len: List[int] = field(default_factory=list) # each sub directory has one such image file name length
+    questions_file: str = field(default='questions.json') # it is required to give the same name to all questions json files (no ambiguity since they are under different directories)
+    annotations_file: str = field(default='annotations.json') # it is required to give the same name to all annotations json files (no ambiguity since they are under different directories)
+
+    eval_caption_num_examples: int = field(default=100)
+    eval_caption_log_examples: bool = field(default=False) # for debugging if you wish to show predictions from model in eval for text
+
+    eval_vqa_num_examples: int = field(default=100)
+    eval_vqa_log_examples: bool = field(default=False) # for debugging if you with to show predictions from model in eval for text
 
     # Params for sampling from datasets
     prompt_ep_proportion: float = field(default=0.25) # proportion of episodes that are prompted

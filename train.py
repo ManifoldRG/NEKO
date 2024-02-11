@@ -1,5 +1,6 @@
 import random
 import os
+from datetime import datetime
 
 import wandb
 import torch
@@ -16,6 +17,8 @@ from gato.training.trainer import Trainer
 from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.control_task import ControlTask
 from gato.tasks.text_task import TextTask
+from gato.tasks.caption_task import CaptionTask
+from gato.tasks.vqa_task import VqaTask
 
 
 def main(args):
@@ -23,8 +26,8 @@ def main(args):
     accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
     args.device = accelerator.device.type
 
-    exp_id = random.randint(int(1e5), int(1e6) - 1)
-    exp_name = f'neko-gato-{exp_id}'
+    exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
+    exp_name = f'neko-gato_{exp_date}'
 
     tasks = []
     # add control datasets and env
@@ -47,6 +50,23 @@ def main(args):
         tasks.append(TextTask(args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name))
     else:
         assert (args.text_prop == 0), 'text_prop must be 0 if no text datasets are specified'
+ 
+    if len(args.caption_dataset) > 0:
+        # add caption datasets
+        tasks.append(CaptionTask(args.tokenizer_model_name, args.caption_dataset, args.caption_train_data, args.caption_test_data, args.test_data_prop))
+    else:
+        assert (args.caption_prop == 0), 'caption_prop must be 0 if no text datasets are specified'
+    
+    if len(args.vqa_dataset) > 0:
+        # add vqa datasets
+        tasks.append(VqaTask(args.tokenizer_model_name, 
+                             args.vqa_dataset, args.vqa_train_data, args.vqa_test_data, 
+                             args.train_img_name_prefix, args.train_img_file_name_len, 
+                             args.test_img_name_prefix, args.test_img_file_name_len, 
+                             args.questions_file, args.annotations_file))
+    else:
+        assert (args.vqa_prop == 0), 'vqa_prop must be 0 if no text datasets are specified'
+
 
     model = GatoPolicy(
         device=args.device,
@@ -124,7 +144,6 @@ def main(args):
         exp_name = exp_name,
         args=args
     )
-
     trainer.train()
 
 if __name__ == '__main__':
