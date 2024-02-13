@@ -1,4 +1,5 @@
 import argparse
+import dataclasses
 import os
 import json
 import time
@@ -7,12 +8,14 @@ import torch
 
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
+from gato.training.arguments import TrainingArgs
 
 
 from gato.utils.utils import DotDict
 from gato.policy.gato_policy import GatoPolicy
 from gato.envs.setup_env import load_envs
 from gato.tasks.control_task import ControlTask
+from gato.tasks.text_task import TextTask
 
 
 def main(args):
@@ -25,16 +28,14 @@ def main(args):
     else:
         args_path = args.args_path
     
-    training_args = json.load(open(args_path, 'r'))
-    if not ('lora' in training_args and training_args['lora']):
-        training_args['pretrained_lm'] = None
+    eval_args = TrainingArgs(**json.load(open(args_path, 'r')))
+    if not eval_args.lora:
+        eval_args.pretrained_lm = None
 
     # update args with eval_args
     for k, v in args.items():
         if v is not None:
-            training_args[k] = v
-
-    eval_args = DotDict(training_args)
+            setattr(eval_args, k, v)
 
     env_args = {
         'render_mode': 'human' if args.render else None,
@@ -82,7 +83,7 @@ def main(args):
         pretrained_lm=eval_args.pretrained_lm,
         flash=eval_args.flash
     )
-    if eval_args.get('lora', False):
+    if eval_args.lora:
         assert eval_args.pretrained_lm is not None, 'Must specify pretrained LM for LORA'
         peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=eval_args.lora_r, lora_alpha=eval_args.lora_alpha, lora_dropout=eval_args.lora_dropout)
         model.transformer = get_peft_model(model.transformer, peft_config)
@@ -104,11 +105,11 @@ def main(args):
     # loop over eval for each task
     with torch.no_grad():
         for task in tasks:
-            if task.task_type == TaskTypeEnum.CONTROL.value:
+            if isinstance(task, ControlTask):
                 eval_logs = task.evaluate(model, n_iterations=eval_args.eval_episodes, deterministic=eval_args.eval_mode == 'deterministic', promptless_eval=eval_args.promptless_eval)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/{task.name}/{k}'] = v
-            elif task.task_type == TaskTypeEnum.TEXT.value:
+            elif isinstance(task, TextTask):
                 eval_logs = task.evaluate(model, eval_args.eval_text_num_examples, deterministic=eval_args.eval_mode == 'deterministic', log_examples_to_output=eval_args.eval_text_log_examples)
                 for k, v in eval_logs.items():
                     logs[f'evaluation/text/{k}'] = v
