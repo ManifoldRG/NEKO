@@ -42,7 +42,6 @@ python ./gato/data/download_custom_datasets.py
 ```bash
 docker build -t gato-control -f ./docker/Dockerfile .
 docker run -it --mount "type=bind,source=$(pwd),target=/app/gato-control" --entrypoint /bin/bash --gpus=all gato-control
-
 ```
 
 

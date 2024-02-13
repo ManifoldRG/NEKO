@@ -24,9 +24,19 @@ from gato.tasks.vqa_task import VqaTask
 
 def main(args):
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision, split_batches=True, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
-    device = accelerator.device
-    args.device = accelerator.device
+    if args.use_wandb:
+        log_with = 'wandb'
+    else:
+        log_with = None
+    accelerator = Accelerator(
+        cpu=args.cpu,
+        mixed_precision=args.mixed_precision,
+        split_batches=True,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        kwargs_handlers=[ddp_kwargs],
+        log_with=log_with,
+    )
+    args.device = accelerator.device.type
 
     exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
     exp_name = f'neko-gato_{exp_date}'
@@ -128,11 +138,9 @@ def main(args):
     optimizer, scheduler = accelerator.prepare(optimizer, scheduler)
 
     if args.use_wandb:
-        wandb.init(
-            name = exp_name,
-            project=args.wandb_project,
-            config=args,
-        )
+        accelerator.init_trackers(args.wandb_project, init_kwargs={'wandb': {'name': exp_name, 'config': args}})
+    else:
+        accelerator.init_trackers('')
 
     # Create save dir if does not exist
     if args.save_model and not os.path.exists(args.save_dir):
