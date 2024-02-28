@@ -45,8 +45,7 @@ class Trainer:
         iters = self.args.training_steps // self.args.log_eval_freq
         for i in range(iters):
             logs = self.train_iteration(self.args.log_eval_freq, i)
-            if self.args.use_wandb and self.accelerator.is_main_process:
-                wandb.log(logs)
+            self.accelerator.log(logs)
 
         ## Save model at end of training only if not saving checkpoints
         if self.args.save_model and self.args.save_mode == 'last':
@@ -54,6 +53,8 @@ class Trainer:
             if self.accelerator.is_main_process:
                 unwrapped_model = self.accelerator.unwrap_model(self.model)
                 save_model(unwrapped_model, self.exp_dir, f'checkpoint_{self.steps}', self.args)
+
+        self.accelerator.end_training()
 
 
     def train_iteration(self, num_steps, iter):

@@ -60,7 +60,7 @@ class TextTask(Task):
         return batch_dicts
         
     def evaluate(self, model: GatoPolicy, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):
-        tokenizer = model.text_tokenizer
+        tokenizer = model.module.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0
         total_tokens = 0
@@ -89,7 +89,7 @@ class TextTask(Task):
             new_batch_dict['text'] = input_tokens
 
             # Generate prediction
-            pred_logits, pred_tokens = model.predict_text(new_batch_dict, max_length=len(target_tokens), deterministic=deterministic)
+            pred_logits, pred_tokens = model.module.predict_text(new_batch_dict, max_length=len(target_tokens), deterministic=deterministic)
             # todo: pull 50 into a CLI argument in train.py
             if log_examples_to_output and idx%50==0:
                 print(f'Text Example : {tokenizer.decode(batch_dict["text"])} \n Input passed to model : {tokenizer.decode(new_batch_dict["text"])} \n Predicted output : {tokenizer.decode(pred_tokens)}')
