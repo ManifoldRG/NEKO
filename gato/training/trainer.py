@@ -29,7 +29,7 @@ class Trainer:
         self.tasks = tasks
         self.args = args
         self.print_logs = True # args.print_logs
-        self.device = args.device
+        self.device = torch.device(args.device)
 
         self.min_lr = self.args.learning_rate / self.args.min_factor
         self.deterministic = self.args.eval_mode == 'deterministic'
