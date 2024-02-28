@@ -111,11 +111,11 @@ class Trainer:
 
         if self.accelerator.is_main_process:
             if self.print_logs:
-                logger.info('=' * 80)
-                logger.info(f'Iteration {iter}')
+                print('=' * 80)
+                print(f'Iteration {iter}')
                 for k, v in logs.items():
-                    logger.info(f'{k}: {v}')
-                logger.info('=' * 80)
+                    print(f'{k}: {v}')
+                print('=' * 80)
 
         ## Save model
         if self.args.save_model and self.args.save_mode == 'checkpoint':

@@ -106,7 +106,6 @@ def main(args):
             logger.info('Loading model from checkpoint:', args.init_checkpoint)
             model.load_state_dict(torch.load(args.init_checkpoint, map_location=args.device))
 
-    # print trainable parameters
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info('Trainable Parameters:', '{}M'.format(params / 1e6))
     args.trainable_params = params

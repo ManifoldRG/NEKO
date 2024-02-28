@@ -125,11 +125,11 @@ class CaptionTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.dataset['test']):
-            logger.info(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.warning(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.dataset['test'])
 
         if log_examples_to_output:
-            logger.info(f'--- examples ---')
+            print(f'--- examples ---')
 
         random_indices = [random.randint(0, len(self.dataset['test'])-1) for _ in range(num_examples_to_test)]
         selected_examples = [self.dataset['test'][idx] for idx in random_indices]
@@ -142,15 +142,15 @@ class CaptionTask(Task):
             # Generate prediction
             pred_logits, pred_caption = model.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
-                logger.info(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
-                logger.info("----")
+                print(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
+                print("----")
 
             # Calculate loss
             loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
         if log_examples_to_output:
-            logger.info(f'--- examples end ---')
+            print(f'--- examples end ---')
 
         avg_loss = total_loss / num_examples_to_test
         perplexity = torch.exp(torch.tensor(avg_loss))
@@ -171,9 +171,9 @@ if __name__ == '__main__':
     #logger.info(task.dataset["train"][4]["images"][0][2][15])
     #logger.info(task.dataset["train"][4]["text"])
     batch = task.sample_batch(5)
-    #logger.info(batch)
-    logger.info(type(batch))
-    logger.info(batch[0]['images'][0][1][10])
-    logger.info(batch[0]['images'][0][2][15])
-    logger.info(batch[0]['images'].shape)
-    logger.info(batch[0]['text'])
+    #print(batch)
+    print(type(batch))
+    print(batch[0]['images'][0][1][10])
+    print(batch[0]['images'][0][2][15])
+    print(batch[0]['images'].shape)
+    print(batch[0]['text'])

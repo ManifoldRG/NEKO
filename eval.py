@@ -117,10 +117,10 @@ def main(args):
 
     logs['time/evaluation'] = time.time() - eval_start
 
-    logger.info('=' * 80)
-    logger.info(f'Evaluation results:')
+    print('=' * 80)
+    print(f'Evaluation results:')
     for k, v in logs.items():
-        logger.info(f'{k}: {v}')
+        print(f'{k}: {v}')
 
 
 if __name__ == '__main__':

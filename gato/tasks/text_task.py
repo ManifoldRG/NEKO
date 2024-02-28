@@ -69,14 +69,14 @@ class TextTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.text_dataset['test']):
-            logger.info(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.warning(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.text_dataset['test'])
 
         if log_examples_to_output:
-            logger.info(f'--- examples ---')
+            print(f'--- examples ---')
         
         batch_dicts = self.sample_batch(num_examples_to_test, is_test=True)
-        logger.info(f'Num of examples to test : {num_examples_to_test} | Actual batch size of test data : {len(batch_dicts)}')
+        print(f'Num of examples to test : {num_examples_to_test} | Actual batch size of test data : {len(batch_dicts)}')
         
         actual_examples_tested = 0
         for idx in range(min(num_examples_to_test, len(batch_dicts))):
@@ -95,8 +95,8 @@ class TextTask(Task):
             pred_logits, pred_tokens = model.predict_text(new_batch_dict, max_length=len(target_tokens), deterministic=deterministic)
             # todo: pull 50 into a CLI argument in train.py
             if log_examples_to_output and idx%50==0:
-                logger.info(f'Text Example : {tokenizer.decode(batch_dict["text"])} \n Input passed to model : {tokenizer.decode(new_batch_dict["text"])} \n Predicted output : {tokenizer.decode(pred_tokens)}')
-                logger.info("----")
+                print(f'Text Example : {tokenizer.decode(batch_dict["text"])} \n Input passed to model : {tokenizer.decode(new_batch_dict["text"])} \n Predicted output : {tokenizer.decode(pred_tokens)}')
+                print("----")
 
             # Calculate loss
             target_tokens = torch.Tensor(target_tokens).long()
@@ -105,7 +105,7 @@ class TextTask(Task):
             total_tokens += len(target_tokens)
             actual_examples_tested += 1
         if log_examples_to_output:
-            logger.info(f'--- examples end ---')
+            print(f'--- examples end ---')
 
         avg_loss = total_loss / actual_examples_tested
         perplexity = torch.exp(torch.tensor(avg_loss))
