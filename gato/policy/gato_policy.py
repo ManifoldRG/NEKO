@@ -1,7 +1,7 @@
 from __future__ import annotations
-import logging
-from typing import TYPE_CHECKING, Optional
 
+import logging
+from typing import Optional, Union, TYPE_CHECKING
 import torch
 import torch.nn as nn
 import gymnasium as gym
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class GatoPolicy(nn.Module):
     def __init__(
         self,
-        device: str,
+        device: Union[torch.device, str],
         embed_dim: int,
         layers: int,
         heads: int,
