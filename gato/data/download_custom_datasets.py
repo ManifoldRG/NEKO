@@ -1,5 +1,8 @@
 import os
 import gdown
+import logging
+
+logger = logging.getLogger(__name__)
 
 datasets = {
     'd4rl_halfcheetah-expert-v2': 'https://drive.google.com/drive/folders/1YcUMTS7cMrUP8KJ6aQL87D9uYnrvGT02?usp=drive_link',
@@ -21,6 +24,6 @@ if __name__ == '__main__':
     for dataset_name, url in datasets.items():
         target_path = os.path.join(datasets_dir, dataset_name)
         if os.path.exists(target_path):
-            print(f'{dataset_name} already exists at {target_path}, skipping')
+            logger.info(f'{dataset_name} already exists at {target_path}, skipping')
             continue
         gdown.download_folder(url=url, output=target_path, quiet=False, use_cookies=False)

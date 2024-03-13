@@ -4,7 +4,6 @@ from einops import rearrange
 
 import math
 
-
 class ImageEmbedding(nn.Module):
     def __init__(
             self,

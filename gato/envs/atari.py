@@ -2,7 +2,6 @@ import gymnasium as gym
 from gymnasium.wrappers import AtariPreprocessing, TransformReward 
 import numpy as np
 
-
 def load_atari_env(env_name: str, load_kwargs: dict):
     assert 'v5' in env_name
 

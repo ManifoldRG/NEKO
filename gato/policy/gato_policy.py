@@ -1,8 +1,9 @@
 from __future__ import annotations
+
+import logging
 from typing import Optional, Union, TYPE_CHECKING
 import torch
 import torch.nn as nn
-
 import gymnasium as gym
 import transformers
 from transformers import AutoTokenizer
@@ -11,6 +12,8 @@ from transformers import AutoTokenizer
 from gato.transformers import GPT2Model
 from gato.policy.embeddings import ImageEmbedding
 from gato.policy.input_tokenizers import ContinuousTokenizer
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from gato.tasks.control_task import ControlTask
@@ -77,7 +80,7 @@ class GatoPolicy(nn.Module):
 
 
         if pretrained_lm is not None:
-            print(f'loading pretrained GPT2 weights')
+            logger.info(f'loading pretrained GPT2 weights')
             config = transformers.GPT2Config.from_pretrained(pretrained_lm)
             config.attn_pdrop = dropout # 0.1
             config.resid_pdrop = dropout
