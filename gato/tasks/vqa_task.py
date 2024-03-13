@@ -1,6 +1,7 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task
 
+import logging
 import os
 from PIL import Image
 import io # need to use BytesIO
@@ -14,10 +15,7 @@ import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
-# import logger
-import logging
 logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
 
 class VqaTask(Task): 
     def __init__(self, tokenizer_model:str,
@@ -109,7 +107,7 @@ class VqaTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.dataset['test']):
-            print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.warning(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.dataset['test'])
 
         if log_examples_to_output:
@@ -169,4 +167,3 @@ if __name__ == '__main__':
     print(batch[0]['images'][0][2][15])
     print(batch[0]['images'].shape)
     print(batch[0]['text'])
-

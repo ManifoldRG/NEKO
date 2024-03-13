@@ -5,11 +5,6 @@ import numpy as np
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR
 
-# import logger
-import logging
-logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
-
 def get_linear_warmup_cosine_decay_scheduler(optimizer: Optimizer, num_warmup_steps: int, num_training_steps: int, base_lr: float, init_lr: float, min_lr: float , cosine_decay: bool = True, last_epoch=-1):
 
     lr_lambda = partial(

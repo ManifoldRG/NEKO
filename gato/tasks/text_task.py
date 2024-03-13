@@ -2,6 +2,7 @@ from __future__ import annotations
 # supports dataset in huggingface datasets library for now
 from datasets import load_dataset, concatenate_datasets
 from gato.tasks.task import Task
+import logging
 import numpy as np
 from torch import nn
 from typing import TYPE_CHECKING, List,Dict
@@ -9,10 +10,7 @@ from transformers import AutoTokenizer
 import torch
 import copy
 
-# import logger
-import logging
 logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
 
 if TYPE_CHECKING:
     from gato.policy.gato_policy import GatoPolicy
@@ -71,7 +69,7 @@ class TextTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.text_dataset['test']):
-            print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.warning(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.text_dataset['test'])
 
         if log_examples_to_output:

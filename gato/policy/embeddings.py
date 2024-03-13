@@ -4,11 +4,6 @@ from einops import rearrange
 
 import math
 
-# import logger
-import logging
-logger = logging.getLogger(__name__)
-# Example of use logger.debug(f'foobar')
-
 class ImageEmbedding(nn.Module):
     def __init__(
             self,
