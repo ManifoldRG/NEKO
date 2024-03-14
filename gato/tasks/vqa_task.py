@@ -13,6 +13,10 @@ from torch import nn
 import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
+from pathlib import Path
+
+def img_filepath(datadir: Path, img_id: str) -> Path:
+    return Path(datadir/'train2014'/f'COCO_train2014_{img_id:>012}.jpg')
 
 class VqaTask(Task): 
     def __init__(self, tokenizer_model:str,
@@ -64,7 +68,8 @@ class VqaTask(Task):
             for idx in range(len(questions)):
                 assert annotations[idx]['image_id'] == questions[idx]['image_id'] and annotations[idx]['question_id'] == questions[idx]['question_id']
                 image_id = str(annotations[idx]['image_id'])
-                img_file_name = img_name_prefix[dir_idx] + '0' * (img_file_name_len[dir_idx] - len(image_id) - len(img_name_prefix[dir_idx])) + image_id + '.jpg'
+                img_file_name = img_filepath(Path('/home/eihli/src/NEKO/vqa_data').expanduser(), image_id)
+                #img_file_name = img_name_prefix[dir_idx] + '0' * (img_file_name_len[dir_idx] - len(image_id) - len(img_name_prefix[dir_idx])) + image_id + '.jpg'
                 try:
                     # if the image file does not exist or transpose does not work due to damaged data, we simply discard this sample and move to next
                     img = Image.open(data_directory + img_file_name) 
@@ -92,7 +97,7 @@ class VqaTask(Task):
             batch_dict = {
                 'images': item['image'],
                 # 'text' is to concat the question and a randomly chosen answer with a space in between
-                'text': self.text_tokenizer.encode(item['question'] + ' ' + item['answers'][answer_idx]['answer']) 
+                'text': self.text_tokenizer.encode(self.text_tokenizer.bos_token + item['question'] + ' ' + item['answers'][answer_idx]['answer'] + self.text_tokenizer.eos_token)
             }
             batch_dicts.append(batch_dict)
         return batch_dicts
@@ -121,7 +126,7 @@ class VqaTask(Task):
             target_tokens = tokenizer.encode(target_answer)
 
             # Generate prediction
-            pred_logits, pred_answer = model.predict_answer(image, question, max_length = len(target_tokens),deterministic=deterministic)
+            pred_logits, pred_answer = model.predict_answer(image, question, deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
                 print("----")

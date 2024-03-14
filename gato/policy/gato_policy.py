@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Union, TYPE_CHECKING
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import gymnasium as gym
 import transformers
@@ -272,9 +273,6 @@ class GatoPolicy(nn.Module):
                 text_embeddings = self.embed_token(text_tokens)
                 text_targets_masks = torch.ones_like(text_tokens)
                 n_timesteps = text_tokens.shape[0]
-                # batch_ids.append(text_tokens)
-                # batch_embeddings.append(text_embeddings)
-                # batch_targets.append(torch.ones_like(text_tokens))
 
             if 'images' in batch and batch['images'] is not None or 'image_embeddings' in batch and batch['image_embeddings'] is not None:
                 # Only one of the two should hold, 'image_embeddings' is used during evaluation of caption/vqa task to avoid re-calculating embedding for the same image every time
@@ -341,7 +339,7 @@ class GatoPolicy(nn.Module):
             separator_tokens = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
             separator_targets_masks = torch.zeros(n_timesteps, 1, dtype=torch.long, device=self.device)
 
-            # interleave observation, action tokens,add separator
+            # interleave observation, action tokens, add separator
 
             # interleave tokens
             batch_tokens = torch.cat(
@@ -364,6 +362,7 @@ class GatoPolicy(nn.Module):
                 ],
                 dim=1
             )
+
             # interleave embeddings, n_timesteps x n_tokens x embed_dim
             batch_embeddings = torch.cat(
                 [
@@ -387,12 +386,15 @@ class GatoPolicy(nn.Module):
             else:
                 # Create empty action embeddings
                 action_embeddings = torch.zeros(batch_embeddings.shape[0], 0, self.embed_dim).to(self.device)
+
             batch_embeddings = torch.cat([batch_embeddings, separator_embeddings, action_embeddings], dim=1) # concat action and separator
+
             tokens_per_timestep = batch_embeddings.shape[1] # number of tokens per timestep
             total_tokens = n_timesteps * tokens_per_timestep
 
             # reshape to 1 x (n_timesteps * n_tokens) x embed_dim
             batch_embeddings = batch_embeddings.reshape(1, total_tokens, self.embed_dim)
+
             batch_tokens = batch_tokens.reshape(1, total_tokens)
             batch_target_masks = batch_target_masks.reshape(1, total_tokens)
             total_tokens = batch_embeddings.shape[1]
@@ -482,7 +484,7 @@ class GatoPolicy(nn.Module):
         action_str = 'text'
         start_token = self.token_starts[action_str]
         end_token = self.token_ends[action_str]
-        
+
         image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate response
         n_images = image_embeddings.shape[0]
         n_patches = image_embeddings.shape[1] 
@@ -491,6 +493,7 @@ class GatoPolicy(nn.Module):
         pred_logits = None
         response_tokens = []
 
+        print(f'max length: {max_length}')
         for idx in range(max_length): # idx can be viewed as the index of the 'next_token' within the list of such generated response tokens
 
             # Include 'image_embeddings' instead of 'images' below to avoid re-calculating the same image embedding in every loop
@@ -501,6 +504,8 @@ class GatoPolicy(nn.Module):
                 'image_embeddings': image_embeddings,
                 'text': torch.tensor(prompt_tokens + response_tokens)
             }
+
+            print(self.text_tokenizer.decode(batch_dict['text']))
 
             logits, _ = self.forward([batch_dict])
             # logits' shape is (batch_size, seq_length, vocab_size), here batch_size should always be 1
@@ -516,11 +521,16 @@ class GatoPolicy(nn.Module):
             # In the following line of code, "n_patches - 1 + len(prompt_tokens) + idx" is the index of the token in the sequence that will 
             # predict the next text token of the generated response
             next_token_logits = logits[0, n_patches -1 + len(prompt_tokens) + idx, start_token:(end_token+1)]
+            print('next token logits')
+            print(next_token_logits)
             if deterministic:
                 next_token = torch.argmax(next_token_logits).item()
             else:
                 probs = F.softmax(next_token_logits)
                 next_token = torch.multinomial(probs, num_samples=1).item()
+
+            if next_token == self.text_tokenizer.eos_token_id:
+                break
             
             if pred_logits is None:
                 pred_logits = next_token_logits.unsqueeze(0)
@@ -545,7 +555,7 @@ class GatoPolicy(nn.Module):
         return pred_logits, pred_caption
 
     def predict_answer(self, image, question, max_length=16, deterministic=True):
-        prompt_tokens = self.text_tokenizer.encode(question)
+        prompt_tokens = self.text_tokenizer.encode(f'{self.text_tokenizer.bos_token}{question} ')
         pred_logits, pred_answer =  self.predict_response(image, prompt_tokens = prompt_tokens, max_length=max_length, deterministic=deterministic)
         return pred_logits, pred_answer
 
