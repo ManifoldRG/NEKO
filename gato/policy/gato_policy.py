@@ -520,6 +520,7 @@ class GatoPolicy(nn.Module):
 
             # In the following line of code, "n_patches - 1 + len(prompt_tokens) + idx" is the index of the token in the sequence that will 
             # predict the next text token of the generated response
+
             next_token_logits = logits[0, n_patches -1 + len(prompt_tokens) + idx, start_token:(end_token+1)]
             print('next token logits')
             print(next_token_logits)

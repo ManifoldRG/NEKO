@@ -126,7 +126,7 @@ class VqaTask(Task):
             target_tokens = tokenizer.encode(target_answer)
 
             # Generate prediction
-            pred_logits, pred_answer = model.predict_answer(image, question, deterministic=deterministic)
+            pred_logits, pred_answer = model.predict_answer(image, question, max_length=len(target_tokens), deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
                 print("----")
