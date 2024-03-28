@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Union, TYPE_CHECKING
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import gymnasium as gym
 import transformers
@@ -466,9 +467,6 @@ class GatoPolicy(nn.Module):
         
         return concat_logits, predicted_tokens
 
-
-        return concat_probs, concat_pred_tokens
-    
     # This funciton can be used to generate a response from an image, such as generating the caption or 
     # an answer to a question about an image, it is adapted from the original predict_caption() function
     def predict_response(self, image, prompt_tokens = [], max_length=128, deterministic=True):
@@ -491,8 +489,9 @@ class GatoPolicy(nn.Module):
         pred_logits = None
         response_tokens = []
 
-        for idx in range(max_length): # idx can be viewed as the index of the 'next_token' within the list of such generated response tokens
-
+        idx = 0
+        next_token = None
+        while idx < max_length and next_token != self.text_tokenizer.eos_token_id:
             # Include 'image_embeddings' instead of 'images' below to avoid re-calculating the same image embedding in every loop
             # Note: the following 'text' is actually text token IDs instead of actual text. Reverting back to actual text will result in an edge case
             # where the generated tokens could contain a sequence of .... (periods) or ,,,, (commas), the tokenizer will treat the sequence as one token
@@ -515,7 +514,7 @@ class GatoPolicy(nn.Module):
 
             # In the following line of code, "n_patches - 1 + len(prompt_tokens) + idx" is the index of the token in the sequence that will 
             # predict the next text token of the generated response
-            next_token_logits = logits[0, n_patches -1 + len(prompt_tokens) + idx, start_token:(end_token+1)]
+            next_token_logits = logits[0, n_patches - 1 + len(prompt_tokens) + idx, start_token:(end_token+1)]
             if deterministic:
                 next_token = torch.argmax(next_token_logits).item()
             else:
@@ -530,15 +529,14 @@ class GatoPolicy(nn.Module):
             # Keep appending the next_token to the generated response tokens, continue the loop by feeding the 
             # generated tokens along with the image embeddings into the transformer to generate the next next_token
             response_tokens.append(next_token)
-
+            idx += 1
 
         pred_response = self.text_tokenizer.decode(response_tokens)
 
         # The logits for all of the predicted "next_token"'s as tokens in the predicted response
         # squeeze shape (1, max_length, self.text_tokens) to (max_length, self.text_tokens), 
         #pred_logits = logits[:, n_patches - 1 + len(prompt_tokens): n_patches - 1 + len(prompt_tokens) + max_length, :self.text_tokens].squeeze(0)  
-
-        return pred_logits, pred_response 
+        return pred_logits, pred_response
     
     def predict_caption(self, image, max_length=128, deterministic=True):
         pred_logits, pred_caption =  self.predict_response(image, prompt_tokens = [], max_length=max_length, deterministic=deterministic)
