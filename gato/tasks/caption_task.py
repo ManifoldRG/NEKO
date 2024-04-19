@@ -43,7 +43,7 @@ class CaptionTask(Task):
         assert len(train_data) > 0, "Must provide train datasets for caption task" 
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         self.dataset = {}
-        
+
         if len(test_data) > 0: # Note: len(train_data_directories)>0 also holds due to the abpve-mentioned assert
             self.dataset['train'] = self.process_data(caption_dataset, train_data)
             self.dataset['test'] = self.process_data(caption_dataset, test_data)
@@ -66,7 +66,6 @@ class CaptionTask(Task):
 
                 with open('test_data_mask.json', 'w') as f:
                     json.dump(test_data_mask, f)
-        print("DATASET LEN: ", len(self.dataset['train']), len(self.dataset['test']))
 
     def process_data(self, caption_dataset, data_directories):
         dataset = []
@@ -74,7 +73,6 @@ class CaptionTask(Task):
             tar_files = []
             data_directory = caption_dataset + directory
             for file in os.listdir(data_directory):
-                print("FILE: ", data_directory, file)
                 if fnmatch.fnmatch(file, '*.tar'):
                     tar_files.append(os.path.join(data_directory, file))
         
