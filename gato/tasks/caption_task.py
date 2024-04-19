@@ -78,7 +78,7 @@ class CaptionTask(Task):
         
         # https://github.com/webdataset/webdataset#dataloader: WebDataset is just an instance of a standard IterableDataset
         # In the following, data from multiple tar files are combined into one WebDataset, and then wrapped into a DalaLoader
-        data_loader = DataLoader(wds.WebDataset(tar_files)) 
+        data_loader = DataLoader(wds.WebDataset(tar_files, nodesplitter=wds.split_by_node))
 
         # Iterate through all of the bundles to extract jpg and txt (caption) and place them into the desiganted data structure
         for idx, bundle in enumerate(data_loader):
