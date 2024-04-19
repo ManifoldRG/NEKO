@@ -66,19 +66,25 @@ class CaptionTask(Task):
 
                 with open('test_data_mask.json', 'w') as f:
                     json.dump(test_data_mask, f)
-    
+        print("DATASET LEN: ", len(self.dataset['train']), len(self.dataset['test']))
+
     def process_data(self, caption_dataset, data_directories):
         dataset = []
         for directory in data_directories:
             tar_files = []
             data_directory = caption_dataset + directory
             for file in os.listdir(data_directory):
+                print("FILE: ", data_directory, file)
                 if fnmatch.fnmatch(file, '*.tar'):
                     tar_files.append(os.path.join(data_directory, file))
         
         # https://github.com/webdataset/webdataset#dataloader: WebDataset is just an instance of a standard IterableDataset
         # In the following, data from multiple tar files are combined into one WebDataset, and then wrapped into a DalaLoader
-        data_loader = DataLoader(wds.WebDataset(tar_files, nodesplitter=wds.split_by_node))
+        #
+        # Use split_by_worker rather than split_by_node because, I think, because one of our datasets doesn't have enough
+        # test examples to split across multiple nodes and some nodes will eventually get a test dataset of len 0 and
+        # result in a div by 0 error.
+        data_loader = DataLoader(wds.WebDataset(tar_files, nodesplitter=wds.split_by_worker))
 
         # Iterate through all of the bundles to extract jpg and txt (caption) and place them into the desiganted data structure
         for idx, bundle in enumerate(data_loader):
@@ -116,7 +122,7 @@ class CaptionTask(Task):
         return batch_dicts
 
     def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):    
-        tokenizer = model.text_tokenizer
+        tokenizer = model.module.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0
         total_tokens = 0
@@ -137,7 +143,7 @@ class CaptionTask(Task):
             target_tokens = tokenizer.encode(target_caption)
 
             # Generate prediction
-            pred_logits, pred_caption = model.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
+            pred_logits, pred_caption = model.module.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
                 print("----")
