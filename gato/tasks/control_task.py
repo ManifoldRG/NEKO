@@ -1,10 +1,15 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import gymnasium as gym
 import numpy as np
 import torch
 import minari
 from minari.dataset.minari_dataset import EpisodeData
-
 from gato.tasks.task import Task
+
+if TYPE_CHECKING:
+    from gato.policy.gato_policy import GatoPolicy
 
 supported_spaces = [
     gym.spaces.Box,
@@ -22,9 +27,9 @@ def tokens_per_space(space):
    
 class ControlTask(Task):
     def __init__(
-            self, 
-            env_name: str, 
-            env: gym.Env, 
+            self,
+            env_name: str,
+            env: gym.Env,
             dataset: minari.MinariDataset, 
             context_len: int,
             args,
@@ -98,7 +103,7 @@ class ControlTask(Task):
             self.top_ids = None
 
     
-    def evaluate(self, model, n_iterations, deterministic=True, promptless_eval=False):
+    def evaluate(self, model: GatoPolicy, n_iterations, deterministic=True, promptless_eval=False):
         # serial evaluation
         returns = []
         clipped_returns = []
