@@ -148,6 +148,9 @@ class GatoPolicy(nn.Module):
         self.use_pos_encoding = use_pos_encoding
         self.pos_embed_observation = nn.Embedding(context_len, embed_dim)
 
+    @property
+    def module(self):
+        return self
 
     # predicts next token (for each input token)
     def forward(self, inputs: Optional[list]=None, compute_loss=False, **kwargs):
