@@ -89,7 +89,9 @@ class TextTask(Task):
             
             # Split the tokens into input and target tokens
             tokens = batch_dict['text']
-            ith_position = np.random.randint(0, len(tokens))
+            if len(tokens) <= 1:
+                continue
+            ith_position = np.random.randint(1, len(tokens))
             input_tokens = tokens[:ith_position]
             target_tokens = tokens[ith_position:]
 
