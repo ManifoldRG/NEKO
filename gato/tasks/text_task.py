@@ -17,16 +17,24 @@ class TextTask(Task):
         super().__init__()
         self.context_length = context_length
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
-        text_datasets_list = []
-        assert len(dataset_names) == len(dataset_paths), "The dataset names and paths parameters should have corresponding values and hence equal lengths"
-        for i, text_dataset in enumerate(dataset_names):
-            text_datasets_list.append(load_dataset(path=dataset_paths[i], name=text_dataset))
-        if len(text_datasets_list) == 1:
-            self.text_dataset = text_datasets_list[0]
-        else:            
-            # https://huggingface.co/docs/datasets/v2.14.4/en/process#concatenate
-            # must have the same feature columns
-            self.text_dataset = concatenate_datasets(text_datasets_list)
+        # text_datasets_list = []
+        # assert len(dataset_names) == len(dataset_paths), "The dataset names and paths parameters should have corresponding values and hence equal lengths"
+        # for i, text_dataset in enumerate(dataset_names):
+        #     text_datasets_list.append(load_dataset(path=dataset_paths[i], name=text_dataset))
+        # if len(text_datasets_list) == 1:
+        #     self.text_dataset = text_datasets_list[0]
+        # else:
+        #     # https://huggingface.co/docs/datasets/v2.14.4/en/process#concatenate
+        #     # must have the same feature columns
+        #     self.text_dataset = concatenate_datasets(text_datasets_list)
+        #
+        #
+        # Checkout Huggingface datasets version 2.5.2. That's the most recent version that includes `ptb_text_only`. Load the dataset
+        # so that you'll have it cached. Then use that directory.
+        dspath = '/home/eihli/.cache/huggingface/datasets/ptb_text_only/penn_treebank/1.1.0/8d1b97746fb9765d140e569ec5ddd35e20af4d37761f5e1bf357ea0b081f2c1f'
+        ds = load_dataset(dspath)
+        ds = ds.rename_column('sentence', 'text')
+        self.text_dataset = ds
 
         
     def sample_batch(self, batch_size, is_test=False)->List[Dict]:
