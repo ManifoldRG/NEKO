@@ -8,6 +8,7 @@ import torch
 from peft import LoraConfig, TaskType, get_peft_model
 from accelerate import Accelerator
 from accelerate import DistributedDataParallelKwargs
+from accelerate import DataLoaderConfiguration
 
 from gato.utils.typed_argparser import TypedArgumentParser
 from gato.training.arguments import TrainingArgs
@@ -23,18 +24,8 @@ from gato.tasks.vqa_task import VqaTask
 
 def main(args):
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    if args.use_wandb:
-        log_with = 'wandb'
-    else:
-        log_with = None
-    accelerator = Accelerator(
-        cpu=args.cpu,
-        mixed_precision=args.mixed_precision,
-        split_batches=True,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        kwargs_handlers=[ddp_kwargs],
-        log_with=log_with,
-    )
+    dl_config = DataLoaderConfiguration(split_batches=True)
+    accelerator = Accelerator(cpu=args.cpu, dataloader_config=dl_config, mixed_precision=args.mixed_precision, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
     args.device = accelerator.device.type
 
     exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
