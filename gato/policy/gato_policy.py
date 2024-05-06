@@ -137,11 +137,7 @@ class GatoPolicy(nn.Module):
         self.use_patch_pos_encoding = use_patch_pos_encoding
         self.image_embedding = ImageEmbedding(
             embed_dim=embed_dim,
-            patch_size=patch_size,
-            resid_mid_channels=resid_mid_channels,
-            num_groups=num_groups,
-            position_vocab_size=position_vocab_size,
-            use_pos_encoding=self.use_patch_pos_encoding,
+            patch_size=patch_size
         )
 
         ## Inner-timestep Embeddings
