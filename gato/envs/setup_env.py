@@ -39,7 +39,7 @@ def load_env_dataset(dataset_name: str, load_kwargs: dict = {}):
     # load dataset
     dataset = minari.load_dataset(dataset_name)
 
-    env_name = dataset._data.env_spec.id
+    env_name = dataset.spec.env_spec.id
     env = None
 
     # custom environment build if custom loader specified
@@ -50,7 +50,7 @@ def load_env_dataset(dataset_name: str, load_kwargs: dict = {}):
 
     # Default to recovering dataset from Minari
     if env is None:
-        env = gym.make(dataset._data.env_spec, **load_kwargs)
+        env = gym.make(dataset.spec.env_spec, **load_kwargs)
 
     
     return env, dataset

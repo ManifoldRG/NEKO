@@ -24,8 +24,20 @@ from gato.tasks.vqa_task import VqaTask
 
 def main(args):
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    if args.use_wandb:
+        log_with = 'wandb'
+    else:
+        log_with = None
+
     dl_config = DataLoaderConfiguration(split_batches=True)
-    accelerator = Accelerator(cpu=args.cpu, dataloader_config=dl_config, mixed_precision=args.mixed_precision, gradient_accumulation_steps=args.gradient_accumulation_steps, kwargs_handlers=[ddp_kwargs])
+    accelerator = Accelerator(
+        cpu=args.cpu,
+        dataloader_config=dl_config, 
+        mixed_precision=args.mixed_precision,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        kwargs_handlers=[ddp_kwargs],
+        log_with=log_with
+    )
     args.device = accelerator.device.type
 
     exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
@@ -128,11 +140,9 @@ def main(args):
     optimizer, scheduler = accelerator.prepare(optimizer, scheduler)
 
     if args.use_wandb:
-        wandb.init(
-            name = exp_name,
-            project=args.wandb_project,
-            config=args,
-        )
+        accelerator.init_trackers(args.wandb_project, init_kwargs={'wandb': {'name': exp_name, 'config': args}})
+    else:
+        accelerator.init_trackers('')
 
     # Create save dir if does not exist
     if args.save_model and not os.path.exists(args.save_dir):

@@ -98,7 +98,7 @@ class VqaTask(Task):
         return batch_dicts
 
     def evaluate(self, model, num_examples_to_test=50, deterministic=True, log_examples_to_output=False):    
-        tokenizer = model.text_tokenizer
+        tokenizer = model.module.text_tokenizer
         loss_fn = nn.CrossEntropyLoss()
         total_loss = 0
         total_tokens = 0
