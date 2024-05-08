@@ -14,6 +14,12 @@ import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
 
+def pad(a: torch.Tensor, b: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    if len(b) > len(a):
+        return b, F.pad(a, (0, len(b) - len(a)), 'constant', 0)
+    else:
+        return F.pad(b, (0, len(a) - len(b)), 'constant', 0), a
+
 class VqaTask(Task): 
     def __init__(self, tokenizer_model:str,
                  vqa_dataset, train_data, test_data, 
@@ -121,13 +127,13 @@ class VqaTask(Task):
             target_tokens = tokenizer.encode(target_answer)
 
             # Generate prediction
-            pred_logits, pred_answer = model.predict_answer(image, question, max_length = len(target_tokens),deterministic=deterministic)
+            pred_logits, pred_answer = model.predict_answer(image, question, deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
                 print("----")
 
             # Calculate loss
-            loss = loss_fn(pred_logits, torch.tensor(target_tokens).to(model.device))
+            loss = loss_fn(*pad(pred_logits, torch.tensor(target_tokens).to(model.device)))
             total_loss += loss.item()
             total_tokens += len(target_tokens)
         if log_examples_to_output:
