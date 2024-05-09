@@ -19,8 +19,8 @@ def get_linear_warmup_cosine_decay_scheduler(optimizer: Optimizer, num_warmup_st
     return LambdaLR(optimizer, lr_lambda, last_epoch)
 
 def _linear_warmup_cosine_decay(current_step: int, *, num_warmup_steps: int,num_training_steps: int, base_lr: float, init_lr: float, min_lr: float, cosine_decay: bool):
-    if current_step <= num_warmup_steps:
-        lr = init_lr + (base_lr - init_lr) * current_step / float(max(1, num_warmup_steps))
+    if current_step <= num_warmup_steps and num_warmup_steps != 0:
+        lr = init_lr + (base_lr - init_lr) * current_step / num_warmup_steps
     elif cosine_decay:
         # cosine decay from base_lr to min_lr over remaining steps
         progress = (current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))

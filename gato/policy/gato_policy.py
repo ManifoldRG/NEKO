@@ -31,7 +31,7 @@ class GatoPolicy(nn.Module):
         M: int = 256,
 
         patch_size: int = 16,
-        resid_mid_channels: int = 132,
+        resid_mid_channels: int = 128,
         num_groups: int = 32,
         position_vocab_size: int = 128,
         continuous_tokens: int = 1024,
@@ -468,9 +468,6 @@ class GatoPolicy(nn.Module):
         
         return concat_logits, predicted_tokens
 
-
-        return concat_probs, concat_pred_tokens
-    
     # This funciton can be used to generate a response from an image, such as generating the caption or 
     # an answer to a question about an image, it is adapted from the original predict_caption() function
     def predict_response(self, image, prompt_tokens = [], max_length=128, deterministic=True):
@@ -530,9 +527,6 @@ class GatoPolicy(nn.Module):
                 probs = F.softmax(next_token_logits)
                 next_token = torch.multinomial(probs, num_samples=1).item()
 
-            if next_token == self.text_tokenizer.eos_token_id:
-                break
-            
             if pred_logits is None:
                 pred_logits = next_token_logits.unsqueeze(0)
             else:

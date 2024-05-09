@@ -97,7 +97,7 @@ class VqaTask(Task):
             batch_dict = {
                 'images': item['image'],
                 # 'text' is to concat the question and a randomly chosen answer with a space in between
-                'text': self.text_tokenizer.encode(self.text_tokenizer.bos_token + item['question'] + ' ' + item['answers'][answer_idx]['answer'] + self.text_tokenizer.eos_token)
+                'text': self.text_tokenizer.encode(item['question'] + ' ' + item['answers'][answer_idx]['answer'])
             }
             batch_dicts.append(batch_dict)
         return batch_dicts
