@@ -6,3 +6,5 @@ wandb/
 *.egg-info
 .idea
 .ipynb_checkpoints/
+vqa_data/
+caption_data/
