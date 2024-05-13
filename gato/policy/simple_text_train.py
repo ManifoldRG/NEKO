@@ -218,7 +218,7 @@ class GatoPolicy(nn.Module):
         return token_embeddings, tokens, token_masks, target_tokens, target_masks
 
     def predict_text(self, input_text, max_length=20, deterministic=True, context_length=1024):
-        tokenized_outputs = self.text_tokenizer(input_text, truncation=True, padding="longest", max_length=args.sequence_length, return_tensors='pt')
+        tokenized_outputs = self.text_tokenizer(input_text, truncation=True, padding="longest", max_length=context_length, return_tensors='pt')
 
         input_tokens = tokenized_outputs['input_ids']
         predicted_tokens = input_tokens.clone()
@@ -321,8 +321,8 @@ class TextTask(Task):
         
         # total_tokens = input_tokens.size(0) * input_tokens.size(1)
         # print(f'total tokens:{total_tokens}')
-        avg_loss = loss.item() 
-        perplexity = torch.exp(torch.tensor(avg_loss)).item()
+        avg_loss = loss.detach().cpu().item()
+        perplexity = torch.exp(torch.tensor(avg_loss)).detach().cpu().item()
                         
         return {'loss': avg_loss, 'perplexity': perplexity}
     
@@ -426,7 +426,7 @@ def train_iteration(num_steps, iter):
                         if len(words_list) > 1:
                             split_index = random.randint(1, len(words_list)-1)
                             input_text, target_text = ' '.join(words_list[:split_index]), ' '.join(words_list[split_index:])  
-                            pred_tokens = model.predict_text(input_text='Hello how are', max_length=len(words_list[split_index:]), deterministic=deterministic)
+                            pred_tokens = model.predict_text(input_text=actual_text, max_length=len(words_list[split_index:]), deterministic=deterministic)
                             decoded_target = task.text_tokenizer.decode(pred_tokens.squeeze(), skip_special_tokens=True)
                             print(f'Input: {input_text} | Output : {target_text} | Prediction: {decoded_target}')
 
@@ -459,18 +459,23 @@ args = TrainingArgs(
     log_eval_freq=10,
     warmup_steps=100,
     batch_size=4,
-    sequence_length=128,
+    gradient_accumulation_steps=8,
+    sequence_length=1024,
     eval_episodes=5,
     text_prop=1,
     eval_text_log_examples=True,
     # pretrained_lm='gpt2',
-    text_datasets=['plain_text'],
-    text_datasets_paths=["Skylion007/openwebtext"],
+    # text_datasets=['text'],
+    text_datasets=['wikitext-2-v1'],
+    # text_datasets_paths=["JeanKaddour/minipile"],
+    text_datasets_paths=['wikitext'],
     use_wandb=True,
-    device='cuda',
+    device='cuda:1',
     eval_mode='stochastic',
     eval_text_num_examples=100,
     heads=4,
+    # mixed_precision='fp16',
+    cpu=False,
     # disable_cosine_decay=True
 )
 
