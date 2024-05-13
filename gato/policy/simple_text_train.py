@@ -219,6 +219,7 @@ class GatoPolicy(nn.Module):
 
     def predict_text(self, input_text, max_length=20, deterministic=True, context_length=1024):
         tokenized_outputs = self.text_tokenizer(input_text, truncation=True, padding="longest", max_length=context_length, return_tensors='pt')
+        # using padding=max_length didn't work. causes CUDA OOM or other issues.
 
         input_tokens = tokenized_outputs['input_ids']
         predicted_tokens = input_tokens.clone()
@@ -294,27 +295,12 @@ class TextTask(Task):
     
         return batch_dicts
 
-    def evaluate(self, model: GatoPolicy, num_examples_to_test=50, deterministic=False, is_test=True):
-        split = 'train' if not is_test else 'test'
-        try:
-            dataset_split = self.text_dataset[split]
-        except Exception as e:
-            print(f'WARNING:using train only since test is unavailable in dataset!')
-            dataset_split = self.text_dataset['train']
-            is_test=False
-        
-        num_examples_to_test = min(num_examples_to_test, len(dataset_split))
-        
+    def evaluate(self, model: GatoPolicy, num_examples_to_test=8, deterministic=False, is_test=True):
+        # REMEMBER TO MAKE SURE THE num_examples_to_test <= total num of examples in dataset[split]
         if num_examples_to_test == 0:
             return {'loss': float('nan'), 'perplexity': float('nan')}
     
         batch_dicts = self.sample_batch(num_examples_to_test, is_test)
-
-        # input_tokens = torch.stack([b['text'] for b in batch_dicts]).to(model.device)
-        # target_tokens = torch.stack([b['target'] for b in batch_dicts]).to(model.device)
-        
-        # input_tokens = torch.stack([b['text'] for b in batch_dicts]).to(model.device)
-        # target_tokens = torch.stack([b['target'] for b in batch_dicts]).to(model.device)
 
         # Forward pass    
         logits, loss = model(batch_dicts, compute_loss=True)
@@ -420,12 +406,16 @@ def train_iteration(num_steps, iter):
                     samples = dataset_split.select(sampled_indices)
                     
                     for sample in samples:
-                        actual_text = sample['text']
+                        # GPT-2 hardcore limit of context length!
+                        # If you don't set it, and you get an example > 1024 in length
+                        # You face that weird error : tensor a (1024) must match dimension tensor b (1023) at singleton dimension 3 (something like this) 
+                        actual_text = sample['text'][:1024]
                         # roughly speaking...splitting by spaces
                         words_list = actual_text.split()
                         if len(words_list) > 1:
                             split_index = random.randint(1, len(words_list)-1)
-                            input_text, target_text = ' '.join(words_list[:split_index]), ' '.join(words_list[split_index:])  
+                            input_text, target_text = ' '.join(words_list[:split_index]), ' '.join(words_list[split_index:])
+                            print(f'input text : {input_text} | split index: {split_index}')
                             pred_tokens = model.predict_text(input_text=actual_text, max_length=len(words_list[split_index:]), deterministic=deterministic)
                             decoded_target = task.text_tokenizer.decode(pred_tokens.squeeze(), skip_special_tokens=True)
                             print(f'Input: {input_text} | Output : {target_text} | Prediction: {decoded_target}')
@@ -455,27 +445,29 @@ def train_iteration(num_steps, iter):
 
 
 args = TrainingArgs(
-    training_steps=1000,
+    training_steps=15000,
     log_eval_freq=10,
     warmup_steps=100,
-    batch_size=4,
+    batch_size=8,
     gradient_accumulation_steps=8,
     sequence_length=1024,
     eval_episodes=5,
     text_prop=1,
-    eval_text_log_examples=True,
+    eval_text_log_examples=False, # set to false cuz accelerate/multigpu doesn't work with it
     # pretrained_lm='gpt2',
-    # text_datasets=['text'],
-    text_datasets=['wikitext-2-v1'],
-    # text_datasets_paths=["JeanKaddour/minipile"],
-    text_datasets_paths=['wikitext'],
+    text_datasets=['text'],
+    text_datasets_paths=["JeanKaddour/minipile"],
+    # text_datasets=['wikitext-2-v1'],
+    # text_datasets_paths=['wikitext'],
     use_wandb=True,
     device='cuda:1',
     eval_mode='stochastic',
-    eval_text_num_examples=100,
-    heads=4,
+    eval_text_num_examples=16,
+    # heads=8,
     # mixed_precision='fp16',
     cpu=False,
+    save_dir='models_minipile',
+    save_model=True,
     # disable_cosine_decay=True
 )
 
@@ -553,6 +545,7 @@ start_time = None
 
 # Create save dir if does not exist
 if args.save_model and not os.path.exists(args.save_dir):
+    print(f'saving model to {args.save_dir}')
     os.makedirs(args.save_dir)
     
 start_time = time.time()
