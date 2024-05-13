@@ -1,7 +1,18 @@
-# RUN COMMAND : CUDA_VISIBLE_DEVICES="0, 1, 2, 3, 4, 5, 6" accelerate launch simple_text_train.py
+import argparse
+import dataclasses
+import os
+import json
+import time
 
-from __future__ import annotations
-# supports dataset in huggingface datasets library for now
+import torch
+
+from peft import LoraConfig, TaskType, get_peft_model
+from accelerate import Accelerator
+from gato.training.arguments import TrainingArgs
+
+
+from gato.utils.utils import DotDict
+from gato.envs.setup_env import load_envs
 
 import sys
 sys.path.insert(0, '/home/bhavul/bhavul/NEKO/')
@@ -47,7 +58,6 @@ from gato.training.schedulers import get_linear_warmup_cosine_decay_scheduler
 from gato.tasks.task import Task
 from gato.utils.utils import save_model
 from gato.training.arguments import TrainingArgs
-
 
 class GatoPolicy(nn.Module):
     def __init__(
@@ -225,10 +235,10 @@ class GatoPolicy(nn.Module):
         predicted_tokens = input_tokens.clone()
     
         for _ in range(max_length):
-            token_embeddings = self.embed_token(predicted_tokens.to(device))
-            token_masks = torch.ones((predicted_tokens.to(device).shape[0], 1), device=device)
+            token_embeddings = self.embed_token(predicted_tokens.to(self.device))
+            token_masks = torch.ones((predicted_tokens.to(self.device).shape[0], 1), device=self.device)
 
-            logits, _ = self.forward(token_embeddings=token_embeddings, tokens=predicted_tokens.to(device), token_masks=token_masks, token_target_masks=None)
+            logits, _ = self.forward(token_embeddings=token_embeddings, tokens=predicted_tokens.to(self.device), token_masks=token_masks, token_target_masks=None)
             logits = logits[:, -1, :]
                 
     
@@ -238,7 +248,7 @@ class GatoPolicy(nn.Module):
                 probs = torch.nn.functional.softmax(logits, dim=-1)
                 next_token = torch.multinomial(probs, 1)  # Sampling a token
     
-            predicted_tokens = torch.cat([predicted_tokens.to(device), next_token.to(device)], dim=1)
+            predicted_tokens = torch.cat([predicted_tokens.to(self.device), next_token.to(self.device)], dim=1)
     
         # all_logits = torch.cat(logits_list, dim=1)
         return predicted_tokens[:, input_tokens.size(1):]
@@ -362,134 +372,45 @@ def train_step():
 
     return loss.detach().cpu().item(), logs
 
-def train_iteration(num_steps, iter):
-    logs = {}
+def main(args):
+    # load checkpoint
+    gato_checkpoint = torch.load(args.model_path, map_location=args.device)
 
-    train_start = time.time()
+    args = TrainingArgs(
+        training_steps=15000,
+        log_eval_freq=10,
+        warmup_steps=100,
+        batch_size=8,
+        gradient_accumulation_steps=6,
+        sequence_length=1024,
+        eval_episodes=5,
+        text_prop=1,
+        eval_text_log_examples=False, # set to false cuz accelerate/multigpu doesn't work with it
+        # pretrained_lm='gpt2',
+        text_datasets=['text'],
+        text_datasets_paths=["JeanKaddour/minipile"],
+        # text_datasets=['wikitext-2-v1'],
+        # text_datasets_paths=['wikitext'],
+        use_wandb=True,
+        device='cuda:1',
+        eval_mode='stochastic',
+        eval_text_num_examples=16,
+        # heads=8,
+        # mixed_precision='fp16',
+        cpu=False,
+        save_dir='models_minipile',
+        save_model=True,
+        # disable_cosine_decay=True
+    )
+    
 
-    train_losses = []
-    steps = 0
-    model.train()
-    for i in range(num_steps):
-        steps += 1
-        result = train_step()
-        if result is None:
-            # steps -= 1
-            # print("Skipped a training step due to empty batch.")
-            continue
-        train_loss, step_logs = result
-        train_losses.append(train_loss)
+    tasks = []
 
-    # add logs from last train_step as well
-    for log in step_logs:
-        logs[log] = step_logs[log]
+    if len(args.text_datasets) > 0:
+        # add text datasets
+        tasks.append(TextTask(args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)) 
 
-    logs['time/training'] = time.time() - train_start
-
-    eval_start = time.time()
-    model.eval()
-
-    # loop over eval for each env
-    with torch.no_grad():
-        for task in tasks:
-            eval_logs = {}
-            if isinstance(task, TextTask):
-                eval_logs = task.evaluate(model, num_examples_to_test=args.eval_text_num_examples, deterministic=deterministic)
-                for k, v in eval_logs.items():
-                    logs[f'evaluation/text/{k}'] = v
-                pass
-
-                if iter % 100 == 0 and args.eval_text_log_examples:
-                    dataset_split = task.text_dataset['test']
-
-                    sampled_indices = torch.randperm(len(dataset_split))[:5]
-                    samples = dataset_split.select(sampled_indices)
-                    
-                    for sample in samples:
-                        # GPT-2 hardcore limit of context length!
-                        # If you don't set it, and you get an example > 1024 in length
-                        # You face that weird error : tensor a (1024) must match dimension tensor b (1023) at singleton dimension 3 (something like this) 
-                        actual_text = sample['text'][:1024]
-                        # roughly speaking...splitting by spaces
-                        words_list = actual_text.split()
-                        if len(words_list) > 1:
-                            split_index = random.randint(1, len(words_list)-1)
-                            input_text, target_text = ' '.join(words_list[:split_index]), ' '.join(words_list[split_index:])
-                            print(f'input text : {input_text} | split index: {split_index}')
-                            pred_tokens = model.predict_text(input_text=actual_text, max_length=len(words_list[split_index:]), deterministic=deterministic)
-                            decoded_target = task.text_tokenizer.decode(pred_tokens.squeeze(), skip_special_tokens=True)
-                            print(f'Input: {input_text} | Output : {target_text} | Prediction: {decoded_target}')
-
-    logs['time/total'] = time.time() - start_time
-    logs['time/evaluation'] = time.time() - eval_start
-    logs['training/train_loss_mean'] = np.mean(train_losses)
-    logs['training/train_loss_std'] = np.std(train_losses)
-
-    if accelerator.is_main_process:
-        if print_logs:
-            print('=' * 80)
-            print(f'Iteration {iter}')
-            for k, v in logs.items():
-                print(f'{k}: {v}')
-            print('=' * 80)
-
-    ## Save model
-    if args.save_model and args.save_mode == 'checkpoint':
-        accelerator.wait_for_everyone()
-        if accelerator.is_main_process:
-            unwrapped_model = accelerator.unwrap_model(model)
-            save_model(unwrapped_model, exp_dir, f'checkpoint_{steps}', args)
-                
-
-    return logs
-
-
-args = TrainingArgs(
-    training_steps=15000,
-    log_eval_freq=10,
-    warmup_steps=100,
-    batch_size=8,
-    gradient_accumulation_steps=6,
-    sequence_length=1024,
-    eval_episodes=5,
-    text_prop=1,
-    eval_text_log_examples=False, # set to false cuz accelerate/multigpu doesn't work with it
-    # pretrained_lm='gpt2',
-    text_datasets=['text'],
-    text_datasets_paths=["JeanKaddour/minipile"],
-    # text_datasets=['wikitext-2-v1'],
-    # text_datasets_paths=['wikitext'],
-    use_wandb=True,
-    device='cuda:1',
-    eval_mode='stochastic',
-    eval_text_num_examples=16,
-    # heads=8,
-    # mixed_precision='fp16',
-    cpu=False,
-    save_dir='models_minipile',
-    save_model=True,
-    # disable_cosine_decay=True
-)
-
-ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-if args.use_wandb:
-    log_with = 'wandb'
-else:
-    log_with = None
-dl_config = DataLoaderConfiguration(split_batches=True)
-accelerator = Accelerator(
-    cpu=args.cpu,
-    dataloader_config=dl_config, 
-    # mixed_precision=args.mixed_precision,
-    # gradient_accumulation_steps=args.gradient_accumulation_steps,
-    kwargs_handlers=[ddp_kwargs],
-    log_with=log_with
-)
-args.device = accelerator.device.type
-exp_date = datetime.now().strftime('%y-%m-%d_%H-%M-%S')
-exp_name = f'neko-gato_{exp_date}'
-
-model = GatoPolicy(
+    model = GatoPolicy(
         device=args.device,
         embed_dim=args.embed_dim,
         layers=args.layers,
@@ -510,57 +431,80 @@ model = GatoPolicy(
         tokenizer_model_name=args.tokenizer_model_name,
         pad_seq=args.pad_seq,
     )
-model = accelerator.prepare(model)
-model.device = args.device
 
-optimizer = torch.optim.AdamW(
-    model.parameters(),
-    lr=args.learning_rate,
-    betas=(args.beta_1, args.beta_2),
-    eps=args.adam_eps,
-    weight_decay=args.weight_decay,
-)
+    model.load_state_dict(gato_checkpoint)
 
-scheduler = get_linear_warmup_cosine_decay_scheduler(optimizer, args.warmup_steps, args.training_steps, base_lr=args.learning_rate, init_lr=args.init_lr, min_lr=args.learning_rate / args.min_factor, cosine_decay=not args.disable_cosine_decay)
-optimizer, scheduler = accelerator.prepare(optimizer, scheduler)
+    accelerator = Accelerator(cpu=args.cpu, mixed_precision=args.mixed_precision)
+    model = accelerator.prepare(model)
+    args.device = accelerator.device                
 
-if args.use_wandb:
-    accelerator.init_trackers(args.wandb_project, init_kwargs={'wandb': {'name': exp_name, 'config': args}})
-else:
-    accelerator.init_trackers('')
 
-tasks = [TextTask(args.text_datasets, args.text_datasets_paths, args.sequence_length, tokenizer_model=args.tokenizer_model_name)]
-args = args
-print_logs = True # args.print_logs
-device = torch.device(args.device)
+    model = model.to(args.device)
+    model.device = args.device
 
-min_lr = args.learning_rate / args.min_factor
-deterministic = args.eval_mode == 'deterministic'
-
-exp_name = exp_name
-exp_dir = os.path.join(args.save_dir, exp_name)
-
-steps = 0
-start_time = None
-
-# Create save dir if does not exist
-if args.save_model and not os.path.exists(args.save_dir):
-    print(f'saving model to {args.save_dir}')
-    os.makedirs(args.save_dir)
+    logs = {}
+    model.eval()
+    eval_start = time.time()
     
-start_time = time.time()
-iters = args.training_steps // args.log_eval_freq
-print(f'iters:{iters}')
-for i in range(iters):
-    logs = train_iteration(args.log_eval_freq, i)
-    accelerator.log(logs)
+    # loop over eval for each task
+    with torch.no_grad():
+        for task in tasks:
+            if isinstance(task, TextTask):
+                eval_logs = task.evaluate(model, num_examples_to_test=args.eval_text_num_examples, deterministic='stochastic')
+                for k, v in eval_logs.items():
+                    logs[f'evaluation/text/{k}'] = v
+                pass
 
-## Save model at end of training only if not saving checkpoints
-if args.save_model and args.save_mode == 'last':
-    accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
-        unwrapped_model = accelerator.unwrap_model(model)
-        save_model(unwrapped_model, exp_dir, f'checkpoint_{steps}', args)
-        torch.cuda.empty_cache()    
 
-accelerator.end_training()
+                dataset_split = task.text_dataset['test']
+
+                sampled_indices = torch.randperm(len(dataset_split))[:5]
+                samples = dataset_split.select(sampled_indices)
+                
+                for sample in samples:
+                    # GPT-2 hardcore limit of context length!
+                    # If you don't set it, and you get an example > 1024 in length
+                    # You face that weird error : tensor a (1024) must match dimension tensor b (1023) at singleton dimension 3 (something like this) 
+                    actual_text = sample['text'][:1024]
+                    # roughly speaking...splitting by spaces
+                    words_list = actual_text.split()
+                    if len(words_list) > 1:
+                        split_index = random.randint(1, len(words_list)-1)
+                        input_text, target_text = ' '.join(words_list[:split_index]), ' '.join(words_list[split_index:])
+                        pred_tokens = model.predict_text(input_text=actual_text, max_length=len(words_list[split_index:]), deterministic='stochastic')
+                        decoded_target = task.text_tokenizer.decode(pred_tokens.squeeze(), skip_special_tokens=True)
+                        print(f'[Input]: {input_text} \n[Output] : {target_text} \n[Prediction]: {decoded_target}\n\n')
+
+    logs['time/evaluation'] = time.time() - eval_start
+
+    print('=' * 80)
+    print(f'Evaluation results:')
+    for k, v in logs.items():
+        print(f'{k}: {v}')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_path', type=str, default=None) # path to model checkpoint
+    parser.add_argument('--args_path', type=str, default=None) # path to args.json file, will use args from same dir if None
+
+    parser.add_argument('--cpu', default=False, action='store_true')
+
+    # evaluation
+    parser.add_argument('--eval_mode', type=str, default='stochastic', choices=['deterministic', 'stochastic'])
+    
+    # evaluation - text
+    parser.add_argument('--embed_dim', '-e', type=int, default=768)
+    parser.add_argument('--sequence_length', '-k', type=int, default=1024) # number of tokens in seq
+    parser.add_argument('--tokenizer_model_name', type=str, default='gpt2')
+    parser.add_argument('--eval_text_num_examples', type=int, default=100)
+    parser.add_argument('--eval_text_log_examples', action='store_true', default=False)
+
+    # datasets / envs
+    parser.add_argument('--control_datasets', type=str, nargs='+', default=None)
+    parser.add_argument('--text_datasets', type=str, nargs='+', default=['wikitext-2-v1']) # ['wikitext-2-v1']
+    parser.add_argument('--text_datasets_paths', type=str, nargs='+', default=['wikitext']) # ['wikitext']
+
+    args = parser.parse_args()
+    args = DotDict(vars(args))
+    main(args)
