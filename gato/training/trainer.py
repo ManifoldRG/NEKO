@@ -1,3 +1,4 @@
+import logging
 import time
 import os
 
@@ -10,6 +11,8 @@ from gato.tasks.caption_task import CaptionTask
 from gato.tasks.vqa_task import VqaTask
 
 from gato.utils.utils import save_model
+
+logger = logging.getLogger(__name__)
 
 class Trainer:
     def __init__(

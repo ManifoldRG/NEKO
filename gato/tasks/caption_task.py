@@ -1,6 +1,7 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task
 
+import logging
 import os
 import tarfile
 import webdataset as wds
@@ -17,6 +18,8 @@ from torch import nn
 import json
 import random
 from transformers import AutoTokenizer, GPT2Tokenizer
+
+logger = logging.getLogger(__name__)
 
 class CaptionTask(Task): 
     def __init__(self, tokenizer_model:str, caption_dataset, train_data, test_data = [],
@@ -126,7 +129,7 @@ class CaptionTask(Task):
         total_tokens = 0
         
         if num_examples_to_test > len(self.dataset['test']):
-            print(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
+            logger.warning(f'num_examples_to_test chosen is more than test examples, so setting it to whole test dataset.')
             num_examples_to_test = len(self.dataset['test'])
 
         if log_examples_to_output:
@@ -168,9 +171,9 @@ if __name__ == '__main__':
     task = CaptionTask(tokenizer_model = 'gpt2', caption_dataset = '/home/<user name>/Git/NEKO/Caption_data', 
                        train_data = ['train'], test_data = ['test'], test_data_prop = 0.1)
 
-    #print(task.dataset["train"][4]["images"][0][1][10])
-    #print(task.dataset["train"][4]["images"][0][2][15])
-    #print(task.dataset["train"][4]["text"])
+    #logger.info(task.dataset["train"][4]["images"][0][1][10])
+    #logger.info(task.dataset["train"][4]["images"][0][2][15])
+    #logger.info(task.dataset["train"][4]["text"])
     batch = task.sample_batch(5)
     #print(batch)
     print(type(batch))
