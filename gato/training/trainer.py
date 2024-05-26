@@ -10,6 +10,7 @@ from gato.tasks.caption_task import CaptionTask
 from gato.tasks.vqa_task import VqaTask
 
 from gato.utils.utils import save_model
+import random
 
 class Trainer:
     def __init__(
@@ -67,7 +68,12 @@ class Trainer:
         self.model.train()
         for i in range(num_steps):
             self.steps += 1
-            train_loss, step_logs = self.train_step()
+            result = self.train_step()
+            if result is None:
+                # steps -= 1
+                # print("Skipped a training step due to empty batch.")
+                continue
+            train_loss, step_logs = result
             train_losses.append(train_loss)
 
         # add logs from last train_step as well
@@ -89,9 +95,32 @@ class Trainer:
                     for k, v in eval_logs.items():
                         logs[f'evaluation/{task.name}/{k}'] = v
                 elif isinstance(task, TextTask):
-                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_text_log_examples)
+                    eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_text_num_examples, deterministic=self.deterministic)
                     for k, v in eval_logs.items():
                         logs[f'evaluation/text/{k}'] = v
+                    pass
+
+                    if iter % 100 == 0 and self.args.eval_text_log_examples:
+                        dataset_split = task.text_dataset['test']
+
+                        sampled_indices = torch.randperm(len(dataset_split))[:5]
+                        samples = dataset_split.select(sampled_indices)
+                        
+                        for sample in samples:
+                            # GPT-2 hardcore limit of context length!
+                            # If you don't set it, and you get an example > 1024 in length
+                            # You face that weird error : tensor a (1024) must match dimension tensor b (1023) at singleton dimension 3 (something like this) 
+                            actual_text = sample['text'][:1024]
+                            # roughly speaking...splitting by spaces
+                            words_list = actual_text.split()
+                            if len(words_list) > 1:
+                                split_index = random.randint(1, len(words_list)-1)
+                                input_text, target_text = ' '.join(words_list[:split_index]), ' '.join(words_list[split_index:])
+                                print(f'input text : {input_text} | split index: {split_index}')
+                                pred_tokens = self.model.predict_text(input_text=actual_text, max_length=len(words_list[split_index:]), deterministic=deterministic)
+                                decoded_target = task.text_tokenizer.decode(pred_tokens.squeeze(), skip_special_tokens=True)
+                                print(f'Input: {input_text} | Output : {target_text} | Prediction: {decoded_target}')
+
                     pass
                 elif isinstance(task, CaptionTask):
                     eval_logs = task.evaluate(self.model, num_examples_to_test=self.args.eval_caption_num_examples, deterministic=self.deterministic, log_examples_to_output=self.args.eval_caption_log_examples)
@@ -151,7 +180,7 @@ class Trainer:
             caption_batch_size = caption_batch_size + residuals[1]
             vqa_batch_size = vqa_batch_size + residuals[2]
             control_batch_size = control_batch_size + residuals[3]
-        assert self.args.batch_size == text_batch_size + caption_batch_size + vqa_batch_size + control_batch_size, "Total atch size is not eqaual to the sum of each task's batch size" 
+        assert self.args.batch_size == text_batch_size + caption_batch_size + vqa_batch_size + control_batch_size, "Total batch size is not eqaual to the sum of each task's batch size" 
 
         text_batch_dicts = []
         caption_batch_dicts = []
@@ -161,6 +190,9 @@ class Trainer:
         # Sample text and control batches
         if text_batch_size > 0:
             text_batch_dicts = self.sample_text_batch(text_batch_size)
+            if not text_batch_dicts:  # Handle empty batch case
+                # print("Received an empty batch. Skipping this step.")
+                return None  # You could return None or handle this case based on your training logic
         if caption_batch_size > 0:
             caption_batch_dicts = self.sample_caption_batch(caption_batch_size)
         if vqa_batch_size > 0:

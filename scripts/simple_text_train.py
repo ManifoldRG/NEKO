@@ -4,7 +4,9 @@ from __future__ import annotations
 # supports dataset in huggingface datasets library for now
 
 import sys
-sys.path.insert(0, '/home/bhavul/bhavul/NEKO/')
+import pathlib
+neko_dir = pathlib.Path(__file__).parent.parent.resolve()
+sys.path.insert(0, neko_dir)
 
 import torch
 import time
