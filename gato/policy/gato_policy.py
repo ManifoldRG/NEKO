@@ -117,7 +117,7 @@ class GatoPolicy(nn.Module):
         # embedding tokens
         self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
         if pretrained_lm is not None:
-            self.embed_token.weight.data[:] = self.transformer.wte.weight.data
+            self.embed_token.weight.data[:self.text_tokens] = self.transformer.wte.weight.data
 
         self.embed_dim = embed_dim
 
