@@ -474,9 +474,8 @@ class GatoPolicy(nn.Module):
     
     # This funciton can be used to generate a response from an image, such as generating the caption or 
     # an answer to a question about an image, it is adapted from the original predict_caption() function
-    def predict_response(self, image, prompt_tokens = [], max_length=128, deterministic=True):
+    def predict_response(self, image_embeddings, prompt_tokens = [], max_length=128, deterministic=True):
         """
-        image is in the format of 1 x 3 x H x W, where 1 is the num_images, 3 is the 3 RGB channels, default value for H and W is 256
         prompt_tokens is a list of text tokens:
             if the predicted response is the caption for the image, then it is an empty list
             if the predicted response is an answer to a question about the image, then this list are the tokens of the question
@@ -486,7 +485,6 @@ class GatoPolicy(nn.Module):
         start_token = self.token_starts[action_str]
         end_token = self.token_ends[action_str]
         
-        image_embeddings = self.image_embedding(image.to(self.device)) # the image embedding that will be used to generate response
         n_images = image_embeddings.shape[0]
         n_patches = image_embeddings.shape[1] 
         assert n_images == 1, "number of images should always be 1 for predicting response"
@@ -543,13 +541,13 @@ class GatoPolicy(nn.Module):
 
         return pred_logits, pred_response 
     
-    def predict_caption(self, image, max_length=128, deterministic=True):
-        pred_logits, pred_caption =  self.predict_response(image, prompt_tokens = [], max_length=max_length, deterministic=deterministic)
+    def predict_caption(self, image_embeddings, max_length=128, deterministic=True):
+        pred_logits, pred_caption =  self.predict_response(image_embeddings, prompt_tokens = [], max_length=max_length, deterministic=deterministic)
         return pred_logits, pred_caption
 
-    def predict_answer(self, image, question, max_length=16, deterministic=True):
+    def predict_answer(self, image_embeddings, question, max_length=16, deterministic=True):
         prompt_tokens = self.text_tokenizer.encode(question)
-        pred_logits, pred_answer =  self.predict_response(image, prompt_tokens = prompt_tokens, max_length=max_length, deterministic=deterministic)
+        pred_logits, pred_answer =  self.predict_response(image_embeddings, prompt_tokens = prompt_tokens, max_length=max_length, deterministic=deterministic)
         return pred_logits, pred_answer
 
     # infer how many tokens needed to generate using environment, and restrict tokens generated to valid tokens for env
