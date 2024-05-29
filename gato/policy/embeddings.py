@@ -31,6 +31,8 @@ class Pretrained_ImageEmbedding(nn.Module):
             ),
         ])
 
+        """
+        # This commented-out block is the first method we tested to extract the image embedding
         self.embedding = None
         # Define a hook function to capture the embedding
         def hook(module, input, output):
@@ -54,6 +56,14 @@ class Pretrained_ImageEmbedding(nn.Module):
             _ = self.model(img)
 
         # Return the captured embedding
+        return embedding
+    """
+    # The following is the second method we tested to extract the image embedding   
+    def forward(self, img): # the img here is the orignal image returned from Image.open(), it is not the image data tensor
+        img = self.transform(img).unsqueeze(0)  # Add a batch dimension
+        # Perform a forward pass to trigger the hook
+        with torch.no_grad(): # Disable gradient computation
+            embedding = self.model.forward_features(img)  # Get the features from the model, this is the image embedding
         return embedding
 
 class ImageEmbedding(nn.Module):
