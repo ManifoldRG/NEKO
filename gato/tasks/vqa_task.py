@@ -91,8 +91,8 @@ class VqaTask(Task):
             answer_idx = random.randint(0, len(item['answers'])-1) # randomly choose an answer out of the set of answers
             batch_dict = {
                 'images': item['image'],
-                # 'text' is to concat the question and a randomly chosen answer with a space in between
-                'text': self.text_tokenizer.encode(item['question'] + ' ' + item['answers'][answer_idx]['answer']) 
+                'text': self.text_tokenizer.encode(item['question']),
+                'vqa_text': self.text_tokenizer.encode(item['answers'][answer_idx]['answer']) 
             }
             batch_dicts.append(batch_dict)
         return batch_dicts
