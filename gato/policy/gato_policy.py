@@ -58,6 +58,8 @@ class GatoPolicy(nn.Module):
         
         # tokens
         self.text_tokens = self.text_tokenizer.vocab_size 
+        if self.text_tokenizer.pad_token is None:
+            self.text_tokenizer.pad_token = self.text_tokenizer.eos_token
         self.continuous_tokens = continuous_tokens
         self.discrete_tokens = discrete_tokens
         self.vocab_size = self.text_tokens + self.discrete_tokens + self.continuous_tokens
@@ -83,6 +85,8 @@ class GatoPolicy(nn.Module):
             config.resid_pdrop = dropout
             config.flash = flash
             config.gate = False
+            config.attn_pdrop = dropout # 0.1
+            config.resid_pdrop = dropout
             self.transformer = GPT2Model.from_pretrained(
                 pretrained_lm,
                 config=config,
@@ -90,9 +94,6 @@ class GatoPolicy(nn.Module):
             embed_dim = config.n_embd
             #self.embed_token = self.transformer.wte
             assert self.transformer.wte.weight.shape[0] == self.text_tokens, "pretrained token/expected mimsatch" # potentially make text_tokens dynamic
-            # expand embedding dictionary up to vocab_size
-            self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
-            self.embed_token.weight.data[:self.text_tokens] = self.transformer.wte.weight.data
         else:
             gate = False
             if activation_fn == 'geglu':
@@ -112,9 +113,11 @@ class GatoPolicy(nn.Module):
             config.flash = flash
             config.n_ctx = context_len
             config.gate = gate
-            self.transformer = self.transformer = GPT2Model(config)
-            # Token Embeddings
-            self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
+            self.transformer = GPT2Model(config)
+        # embedding tokens
+        self.embed_token = nn.Embedding(self.vocab_size, embed_dim)
+        if pretrained_lm is not None:
+            self.embed_token.weight.data[:self.text_tokens] = self.transformer.wte.weight.data
 
         self.embed_dim = embed_dim
 
@@ -156,13 +159,16 @@ class GatoPolicy(nn.Module):
     def forward(self, inputs: Optional[list]=None, compute_loss=False, **kwargs):
         # tokenize inputs
         if inputs is not None:
-            token_embeddings, tokens, token_target_masks, token_masks = self.tokenize_input_dicts(inputs)
+            token_embeddings, tokens, token_masks, target_tokens, target_masks = self.tokenize_input_dicts(inputs)
         else:
             assert 'token_embeddings' in kwargs and 'tokens' in kwargs and 'token_target_masks' in kwargs and 'token_masks' in kwargs, 'if inputs is None, must provide embeddings, tokens, and masks'
             token_embeddings = kwargs['token_embeddings']
             tokens = kwargs['tokens']
             token_target_masks = kwargs['token_target_masks']
             token_masks = kwargs['token_masks']
+
+        assert token_embeddings is not None, "token_embeddings is None"
+        assert token_masks is not None, "token_masks is None"
 
         # pass to transformer
         #final_representations = self.transformer(x = token_embeddings, custom_mask = token_masks, batch_first=True)
@@ -172,23 +178,22 @@ class GatoPolicy(nn.Module):
         logits = self.predict_token(final_representations)
 
         if compute_loss:
-            # obtain target tokens, and pad
-            loss_logits = logits[:, :-1, :] # pick out the probability/logit for very last token 
-            token_masks = token_masks[:, :-1] # whether originating token is valid  (remove last token from mask) 
-
-            token_target_masks = token_target_masks[:, 1:]  # whether target token is valid
-            loss_masks = token_masks * token_target_masks  
-            target_tokens = tokens[:, 1:] 
-
-            loss_masks = loss_masks.reshape(-1) 
-            loss_logits = loss_logits.reshape(-1, self.vocab_size)[loss_masks > 0] 
-            target_tokens = target_tokens.reshape(-1)[loss_masks > 0]       
-            loss = torch.nn.functional.cross_entropy(loss_logits, target_tokens)
-            if 'pdb' in kwargs and kwargs['pdb']:
-                import pdb; pdb.set_trace()
+            # Ensuring target_tokens is a tensor
+            if not isinstance(target_tokens, torch.Tensor):
+                raise TypeError("target_tokens must be a torch.Tensor")
+            
+            # Correctly computing the loss mask
+            loss_masks = (target_tokens != self.text_tokenizer.pad_token_id)
+            if isinstance(loss_masks, torch.Tensor):
+                loss_masks = loss_masks.float()  # Convert boolean tensor to float
+            else:
+                raise TypeError("Loss mask calculation did not return a tensor.")
+            # loss_masks = (target_tokens != self.text_tokenizer.pad_token_id).float()
+            loss = torch.nn.functional.cross_entropy(logits.view(-1, self.vocab_size), target_tokens.view(-1), reduction='none')
+            loss = (loss * loss_masks.view(-1)).sum() / loss_masks.sum()
         else:
             loss = None
-
+    
         return logits, loss
 
 
@@ -429,48 +434,33 @@ class GatoPolicy(nn.Module):
                 tokens = torch.cat([tokens, torch.zeros(batch_len, pad_len, dtype=torch.long, device=self.device)], dim=1)
                 token_target_masks = torch.cat([token_target_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
                 token_masks = torch.cat([token_masks, torch.zeros(batch_len, pad_len, device=self.device)], dim=1)
-        return token_embeddings, tokens, token_target_masks, token_masks
+        return token_embeddings, tokens, token_masks, target_tokens, target_masks
 
-    def predict_text(self, batch_dict, max_length=20, deterministic=True):
-        action_str = 'text'
-        start_token = self.token_starts[action_str]
-        end_token = self.token_ends[action_str]
-        
-        token_embeddings, input_tokens, _, token_masks = self.tokenize_input_dicts([batch_dict])
-        concat_logits = None
-        predicted_tokens = []
-        
-        # predict tokens, sampling or deterministically picking best token
-        for i in range(max_length):
-            logits, _ = self.forward(token_embeddings=token_embeddings, token_masks=token_masks, token_target_masks=None, tokens=None)
-            # extract valid logits - just logits for last token (timestep)
-            logits = logits[0, -1, start_token:(end_token+1)]
-            if concat_logits is None:
-                concat_logits = logits.unsqueeze(0)
-            else:
-                concat_logits = torch.cat([concat_logits, logits.unsqueeze(0)], dim=0)
+    def predict_text(self, input_text, max_length=20, deterministic=True, context_length=1024):
+        tokenized_outputs = self.text_tokenizer(input_text, truncation=True, padding="longest", max_length=context_length, return_tensors='pt')
+        # using padding=max_length didn't work. causes CUDA OOM or other issues.
 
+        input_tokens = tokenized_outputs['input_ids']
+        predicted_tokens = input_tokens.clone()
+    
+        for _ in range(max_length):
+            token_embeddings = self.embed_token(predicted_tokens.to(device))
+            token_masks = torch.ones((predicted_tokens.to(device).shape[0], 1), device=device)
+
+            logits, _ = self.forward(token_embeddings=token_embeddings, tokens=predicted_tokens.to(device), token_masks=token_masks, token_target_masks=None)
+            logits = logits[:, -1, :]
+                
+    
             if deterministic:
-                token = torch.argmax(logits, dim=-1)
+                next_token = torch.argmax(logits, dim=-1).unsqueeze(-1)  # Ensure it keeps batch dimension
             else:
-                # sample from logits
                 probs = torch.nn.functional.softmax(logits, dim=-1)
-                token = torch.multinomial(probs, num_samples=1)[0]
-            token = token + start_token
-
-            # append to token_embeddings and token_masks
-            token_masks = torch.cat([token_masks, torch.ones(token_masks.shape[0], 1, device=self.device)], dim=1)
-            new_embedding = self.embed_token(token) # check shape of new_emebddingss
-            token_embeddings = torch.cat([token_embeddings, new_embedding.reshape(1, 1, -1)], dim=1)
-            # and trim to context len
-            token_embeddings = token_embeddings[:, -self.context_len:, :]
-            token_masks = token_masks[:, -self.context_len:]
-            predicted_tokens.append(token)
-        
-        return concat_logits, predicted_tokens
-
-
-        return concat_probs, concat_pred_tokens
+                next_token = torch.multinomial(probs, 1)  # Sampling a token
+    
+            predicted_tokens = torch.cat([predicted_tokens.to(device), next_token.to(device)], dim=1)
+    
+        # all_logits = torch.cat(logits_list, dim=1)
+        return predicted_tokens[:, input_tokens.size(1):]
     
     # This funciton can be used to generate a response from an image, such as generating the caption or 
     # an answer to a question about an image, it is adapted from the original predict_caption() function
