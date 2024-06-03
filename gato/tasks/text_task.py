@@ -29,6 +29,12 @@ class TextTask(Task):
             # https://huggingface.co/docs/datasets/v2.14.4/en/process#concatenate
             # must have the same feature columns
             self.text_dataset = concatenate_datasets(text_datasets_list)
+        # The dataset we've been testing with, wikitext-2-v1, has a lot of samples that are just empty lines.
+        # It's pointless to train on those, and they just needlessly take up space in our batch if we
+        # let them through, so I'm going to filter them out right here. But the filtering process might be pretty
+        # specific, not very generalizable, so you may need to change this in the future once we expand
+        # to more datasets.
+        self.text_dataset = self.text_dataset.filter(lambda x: x['text'].strip() != '')
 
         
     def sample_batch(self, batch_size, is_test=False) -> List[Dict]:
@@ -54,18 +60,17 @@ class TextTask(Task):
     
         batch_dicts = []
         for input_ids in tokenized_outputs["input_ids"]:
-            if input_ids.numel() > 0:  # Check if non-empty
-                # Split into input and target tokens
-                input_tokens = input_ids[:-1]
-                target_tokens = input_ids[1:]
-                batch_dicts.append({
-                    'text': input_tokens,
-                    'target': target_tokens,
-                    'continuous_obs': None,
-                    'discrete_obs': None,
-                    'continuous_actions': None,
-                    'discrete_actions': None
-                })
+            # Split into input and target tokens
+            input_tokens = input_ids[:-1]
+            target_tokens = input_ids[1:]
+            batch_dicts.append({
+                'text': input_tokens,
+                'target': target_tokens,
+                'continuous_obs': None,
+                'discrete_obs': None,
+                'continuous_actions': None,
+                'discrete_actions': None
+            })
     
         return batch_dicts
         
