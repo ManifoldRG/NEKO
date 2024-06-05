@@ -1,5 +1,6 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task
+from gato.policy.embeddings import Pretrained_ImageEmbedding
 
 import os
 import tarfile
@@ -43,6 +44,7 @@ class CaptionTask(Task):
         assert len(train_data) > 0, "Must provide train datasets for caption task" 
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         self.dataset = {}
+        self.image_embedding = Pretrained_ImageEmbedding()
 
         if len(test_data) > 0: # Note: len(train_data_directories)>0 also holds due to the abpve-mentioned assert
             self.dataset['train'] = self.process_data(caption_dataset, train_data)
@@ -87,22 +89,23 @@ class CaptionTask(Task):
         # Iterate through all of the bundles to extract jpg and txt (caption) and place them into the desiganted data structure
         for idx, bundle in enumerate(data_loader):
             item = {}
-            img = Image.open(io.BytesIO(bundle['jpg'][0])) # bundle['jpg'] is a list of length 1
-            img_data = np.asarray(img)
-            # Through testing of processing multiple .tar files, we have figured out that we need "try except" in the following 
-            # because sometimes the img_data is only (256, 256) insetad of (256, 256,3) (assuming all image sizes are 256x256)
-            # and the following transpose will raise an error and everything grinds to a halt. It is perhaps a bug in the "img2dataset" unitlity
-            # used to downlaod datasets into tar files. When such error occurs, we just ignore the current bundle and move to the next one
-            try:
-                img_data = img_data.transpose(2, 0, 1) # reshape from (256, 256, 3) to (3, 256, 256)
+            try: 
+            # place the following into this try block in case it failes to open the image, we just imgnore this sameple and continue
+                img = Image.open(io.BytesIO(bundle['jpg'][0])) # bundle['jpg'] is a list of length 1
+                img_data = np.asarray(img)
+
+                # Through testing of processing multiple .tar files, we have seen that normally imag_data should be of the shape
+                # (256, 256, 3) (assuming all image sizes are 256x256), so img_data.ndim is 3. But sometimes, we see img_data is 
+                # of the shape (256, 256) only, it is perhaps a bug in the "img2dataset" unitlity used to downlaod datasets into tar files. 
+                # When such error occurs, we need to catch it and ignore the current bundle and move to the next one. 
+                # If this is not caught, it will throw exception and everything grinds to a halt
+                if img_data.ndim < 3:
+                    continue
             except:
                 continue
-    
-            # Need to add a new dimension to (3, 256, 256) so it becomes (1, 3, 256, 256) where the added dummy dimension at dim 0 is the num_images. 
-            # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
-            item['image'] = torch.tensor(img_data[np.newaxis, :])
+            item['image'] = img
             item['text'] = bundle['txt'][0].decode('utf-8')
-            dataset.append(item)
+            dataset.append(item) 
         return dataset       
     
     def sample_batch(self, batch_size):
@@ -112,7 +115,10 @@ class CaptionTask(Task):
         batch_dicts = []
         for item in selected_examples:
             batch_dict = {
-                'images': item['image'],
+                # By default, image will be resized to 224*224, patch size is 16, image_embedding() will return embedding tensor
+                # of the shape (1, 196, 768), where 1 is an added batch dimension, 196 is the numbe of patches, which is the 
+                # result of 14 multiplied by 14, where 14 is the result of image size divided by patch size, i.e. 224/16=14
+                'image_imbeddings': self.image_embedding(item['image']),
                 'text':self.text_tokenizer.encode(item['text'])
             }
             batch_dicts.append(batch_dict)
@@ -141,7 +147,7 @@ class CaptionTask(Task):
             target_tokens = tokenizer.encode(target_caption)
 
             # Generate prediction
-            pred_logits, pred_caption = model.module.predict_caption(image, max_length = len(target_tokens),deterministic=deterministic)
+            pred_logits, pred_caption = model.module.predict_caption(self.image_embedding(image).to(model.device), max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target caption: {target_caption} \n Predicted caption : {pred_caption}')
                 print("----")

@@ -1,9 +1,8 @@
 # Assume all datasets are downloaded and available from local directories
 from gato.tasks.task import Task
-
+from gato.policy.embeddings import Pretrained_ImageEmbedding
 import os
 from PIL import Image
-import io # need to use BytesIO
 
 import numpy as np
 import math
@@ -36,6 +35,8 @@ class VqaTask(Task):
 
         self.text_tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         self.dataset = {}
+        self.image_embedding = Pretrained_ImageEmbedding()
+
         if not vqa_dataset.endswith('/'):
             vqa_dataset = vqa_dataset + '/'
 
@@ -66,16 +67,11 @@ class VqaTask(Task):
                 image_id = str(annotations[idx]['image_id'])
                 img_file_name = img_name_prefix[dir_idx] + '0' * (img_file_name_len[dir_idx] - len(image_id) - len(img_name_prefix[dir_idx])) + image_id + '.jpg'
                 try:
-                    # if the image file does not exist or transpose does not work due to damaged data, we simply discard this sample and move to next
-                    img = Image.open(data_directory + img_file_name) 
-                    img= img.resize((256, 256))
-                    img_data = np.asarray(img)
-                    img_data = img_data.transpose(2, 0, 1) # reshape from (256, 256, 3) to (3, 256, 256)
+                    # if the image file does not exist or some other error occurs, we simply discard this sample and move to next
+                    img = Image.open(data_directory + img_file_name)
                 except:
                     continue
-                # Need to add a new dimension to (3, 256, 256) so it becomes (1, 3, 256, 256) where the added dummy dimension at dim 0 is the num_images. 
-                # In this case, num_images is always 1. This is for the purpose of aligning the data structure with that in the model training
-                item['image'] = torch.tensor(img_data[np.newaxis, :])
+                item['image'] = img
                 item['question'] = questions[idx]['question']
                 item['answers'] = annotations[idx]['answers']
                 dataset.append(item)
@@ -90,7 +86,10 @@ class VqaTask(Task):
         for item in selected_examples:
             answer_idx = random.randint(0, len(item['answers'])-1) # randomly choose an answer out of the set of answers
             batch_dict = {
-                'images': item['image'],
+                # By default, image will be resized to 224*224, patch size is 16, image_embedding() will return embedding tensor
+                # of the shape (1, 196, 768), where 1 is an added batch dimension, 196 is the numbe of patches, which is the 
+                # result of 14 multiplied by 14, where 14 is the result of image size divided by patch size, i.e. 224/16=14
+                'image_imbeddings': self.image_embedding(item['image']),
                 # 'text' is to concat the question and a randomly chosen answer with a space in between
                 'text': self.text_tokenizer.encode(item['question'] + ' ' + item['answers'][answer_idx]['answer']) 
             }
@@ -121,7 +120,7 @@ class VqaTask(Task):
             target_tokens = tokenizer.encode(target_answer)
 
             # Generate prediction
-            pred_logits, pred_answer = model.predict_answer(image, question, max_length = len(target_tokens),deterministic=deterministic)
+            pred_logits, pred_answer = model.predict_answer(self.image_embedding(image).to(model.device), question, max_length = len(target_tokens),deterministic=deterministic)
             if log_examples_to_output and idx%10==0:
                 print(f'Target answer: {target_answer} \n Predicted answer : {pred_answer}')
                 print("----")

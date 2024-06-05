@@ -1,9 +1,70 @@
 import torch
 import torch.nn as nn
-from einops import rearrange
+import timm
+from PIL import Image
+from torchvision import transforms
 
+from einops import rearrange
 import math
 
+class Pretrained_ImageEmbedding(nn.Module):
+    def __init__(
+            self,
+            embed_dim=768,
+            patch_size=16,  
+            # the batch_size and embed_dim passed in here are just placeholders, the embedding model used below will use the deame default value 768 and 16
+            model_name = 'vit_base_patch16_224'  # You can choose different variants, patch size is 16*16, image size is 224*224
+
+    ):
+        super().__init__()
+        # Load a pre-trained Vision Transformer model
+        self.model = timm.create_model(model_name, pretrained=True)
+        self.model.eval()  # Set the model to evaluation mode
+
+        # Define the image transformation pipeline
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),  # Resize the image to the required input size
+            transforms.ToTensor(),  # Convert the image to a PyTorch tensor
+            transforms.Normalize(
+                mean=(0.485, 0.456, 0.406),  # Normalization mean (ImageNet values)
+                std=(0.229, 0.224, 0.225)    # Normalization std (ImageNet values)
+            ),
+        ])
+
+        """
+        # This commented-out block is the first method we tested to extract the image embedding
+        self.embedding = None
+        # Define a hook function to capture the embedding
+        def hook(module, input, output):
+            global embedding
+            embedding = output
+
+        # Register the hook to the patch embedding layer. 
+        self.hook_handle = self.model.patch_embed.register_forward_hook(hook)
+        
+        # After all data processed, remember to call image_embedding.cleanup() which is defined below 
+        # to unregister the hook, assuming the instantiated object from this class is named "image_embedding" 
+        # But this might not be necessary because image_embedding might need to be used even after all data processed?
+        def cleanup(self):
+            #unregister the hook
+            self.hook_handle.remove()
+
+    def forward(self, img): # the img here is the orignal image returned from Image.open(), it is not the image data tensor
+        img = self.transform(img).unsqueeze(0)  # Add a batch dimension
+        # Perform a forward pass to trigger the hook
+        with torch.no_grad():
+            _ = self.model(img)
+
+        # Return the captured embedding
+        return embedding
+    """
+    # The following is the second method we tested to extract the image embedding   
+    def forward(self, img): # the img here is the orignal image returned from Image.open(), it is not the image data tensor
+        img = self.transform(img).unsqueeze(0)  # Add a batch dimension
+        # Perform a forward pass to trigger the hook
+        with torch.no_grad(): # Disable gradient computation
+            embedding = self.model.forward_features(img)  # Get the features from the model, this is the image embedding
+        return embedding
 
 class ImageEmbedding(nn.Module):
     def __init__(
@@ -129,3 +190,4 @@ class ResidualBlock_V2(nn.Module):
         h = self.conv1(self.act1(self.gn1(x)))
         h = self.conv2(self.act2(self.gn2(h)))
         return x + h
+        
